@@ -25,11 +25,14 @@ A personal job search management app with Gmail auto-sync powered by Claude AI.
 npm install
 cp .env.example .env
 # Fill in .env with your keys
-npm run dev
+npm run dev:server
 ```
 
 ### Frontend
-Frontend code organization is prepared under client/src.
+```bash
+npm --prefix client install
+npm run dev:client
+```
 
 ### Deploy to Railway
 See docs/DEPLOYMENT.md for full step by step guide.
@@ -47,6 +50,10 @@ See .env.example for all required variables.
 ## Documentation
 - docs/DEPLOYMENT.md
 - docs/ARCHITECTURE.md
+
+## Production Verification
+- `GET /health` should return `{"status":"ok","version":"1.0.0"}`
+- `GET /auth/status` should return auth state and `lastChecked`
 
 ## Built for
 Manikanth Nampally — Data Engineer, FAU MS 2026

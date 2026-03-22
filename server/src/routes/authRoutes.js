@@ -1,5 +1,10 @@
 const express = require("express");
-const { store } = require("../store/memoryStore");
+const {
+  clearTokens,
+  getLastChecked,
+  getTokens,
+  setTokens,
+} = require("../store/dataStore");
 const { env } = require("../config/env");
 const { oauth2Client, GMAIL_SCOPES } = require("../integrations/gmail");
 
@@ -18,7 +23,7 @@ authRoutes.get("/callback", async (req, res) => {
   const { code } = req.query;
   try {
     const { tokens } = await oauth2Client.getToken(code);
-    store.tokens = tokens;
+    await setTokens(tokens);
     oauth2Client.setCredentials(tokens);
     res.redirect(`${env.FRONTEND_URL}?connected=true`);
   } catch (error) {
@@ -26,13 +31,23 @@ authRoutes.get("/callback", async (req, res) => {
   }
 });
 
-authRoutes.get("/status", (req, res) => {
-  res.json({ connected: Boolean(store.tokens), lastChecked: store.lastChecked });
+authRoutes.get("/status", async (req, res) => {
+  try {
+    const tokens = await getTokens();
+    const lastChecked = await getLastChecked();
+    res.json({ connected: Boolean(tokens), lastChecked });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to read auth status", details: error.message });
+  }
 });
 
-authRoutes.post("/disconnect", (req, res) => {
-  store.tokens = null;
-  res.json({ success: true });
+authRoutes.post("/disconnect", async (req, res) => {
+  try {
+    await clearTokens();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to disconnect", details: error.message });
+  }
 });
 
 module.exports = { authRoutes };

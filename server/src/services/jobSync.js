@@ -1,16 +1,35 @@
-const { store } = require("../store/memoryStore");
+const {
+  addJob,
+  getJobs,
+  getTokens,
+  isProcessedEmail,
+  markProcessedEmail,
+  setLastChecked,
+  setTokens,
+} = require("../store/dataStore");
 const { oauth2Client, createGmailClient } = require("../integrations/gmail");
 const { extractJobInfo } = require("./jobExtractor");
+const { withRetry, withTimeout } = require("../utils/asyncTools");
+const { env } = require("../config/env");
 
 const GMAIL_QUERY = "subject:(application OR applied OR interview OR offer OR rejected OR job OR position OR role OR hiring OR recruiter) newer_than:7d";
 
 async function processEmail(gmail, messageId) {
   try {
-    const msg = await gmail.users.messages.get({
-      userId: "me",
-      id: messageId,
-      format: "full",
-    });
+    const msg = await withRetry(
+      () =>
+        withTimeout(
+          () =>
+            gmail.users.messages.get({
+              userId: "me",
+              id: messageId,
+              format: "full",
+            }),
+          env.EXTERNAL_API_TIMEOUT_MS,
+          "Gmail message get timed out"
+        ),
+      { retries: env.RETRY_ATTEMPTS }
+    );
 
     const headers = msg.data.payload.headers || [];
     const subject = headers.find((h) => h.name === "Subject")?.value || "";
@@ -45,14 +64,15 @@ async function processEmail(gmail, messageId) {
       return;
     }
 
-    const exists = store.jobs.some(
+    const jobs = await getJobs();
+    const exists = jobs.some(
       (job) =>
         job.company?.toLowerCase() === extracted.company?.toLowerCase() &&
         job.role?.toLowerCase() === extracted.role?.toLowerCase()
     );
 
     if (!exists) {
-      store.jobs.push({
+      await addJob({
         id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         ...extracted,
         emailId: messageId,
@@ -67,36 +87,60 @@ async function processEmail(gmail, messageId) {
 }
 
 async function fetchJobEmails() {
-  if (!store.tokens) {
+  const tokens = await getTokens();
+  if (!tokens) {
+    console.log("[sync] skipped: gmail not connected");
     return;
   }
 
-  const gmail = createGmailClient(store.tokens);
+  const gmail = createGmailClient(tokens);
+  const startedAt = Date.now();
 
   try {
-    const list = await gmail.users.messages.list({
-      userId: "me",
-      q: GMAIL_QUERY,
-      maxResults: 20,
-    });
+    const list = await withRetry(
+      () =>
+        withTimeout(
+          () =>
+            gmail.users.messages.list({
+              userId: "me",
+              q: GMAIL_QUERY,
+              maxResults: 20,
+            }),
+          env.EXTERNAL_API_TIMEOUT_MS,
+          "Gmail message list timed out"
+        ),
+      { retries: env.RETRY_ATTEMPTS }
+    );
 
     const messages = list.data.messages || [];
-    const newMessages = messages.filter((message) => !store.processedIds.has(message.id));
+    const newMessages = [];
+    for (const message of messages) {
+      const processed = await isProcessedEmail(message.id);
+      if (!processed) {
+        newMessages.push(message);
+      }
+    }
 
     for (const msg of newMessages) {
       await processEmail(gmail, msg.id);
-      store.processedIds.add(msg.id);
+      await markProcessedEmail(msg.id);
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    store.lastChecked = new Date().toISOString();
+    const checkedAt = new Date().toISOString();
+    await setLastChecked(checkedAt);
 
-    if (store.tokens.expiry_date && store.tokens.expiry_date < Date.now()) {
+    if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
       const { credentials } = await oauth2Client.refreshAccessToken();
-      store.tokens = credentials;
+      await setTokens(credentials);
+      console.log("[sync] refreshed Gmail OAuth token");
     }
+
+    console.log(
+      `[sync] completed: scanned=${messages.length}, processed=${newMessages.length}, durationMs=${Date.now() - startedAt}`
+    );
   } catch (error) {
-    console.error("Gmail fetch error:", error.message);
+    console.error("[sync] failed:", error.message);
   }
 }
 
