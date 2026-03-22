@@ -24,6 +24,13 @@ Add these in your Railway project > Variables tab:
   ANTHROPIC_API_KEY    = from console.anthropic.com
   FRONTEND_URL         = your frontend URL
   PORT                 = 3001
+  CORS_ALLOWED_ORIGINS = your frontend URL
+  EXTERNAL_API_TIMEOUT_MS = 12000
+  RETRY_ATTEMPTS       = 2
+
+Optional (recommended for persistent production storage):
+  SUPABASE_URL               = from Supabase project settings
+  SUPABASE_SERVICE_ROLE_KEY  = from Supabase project settings
 
 ## Step 4 — Update Frontend
 Set your frontend backend URL to the Railway API domain (for example with VITE_BACKEND_URL).
@@ -38,3 +45,11 @@ Set your frontend backend URL to the Railway API domain (for example with VITE_B
 ## Verify It Works
 Visit https://YOUR-APP.railway.app/health
 Expected response: {"status":"ok","version":"1.0.0"}
+
+Visit https://YOUR-APP.railway.app/auth/status
+Expected response before Gmail connect: {"connected":false,"lastChecked":null}
+
+After connecting Gmail:
+- `connected` should become `true`
+- Trigger Sync Jobs from frontend
+- Visit `/jobs` to verify extracted job objects
