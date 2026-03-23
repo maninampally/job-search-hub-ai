@@ -9,6 +9,7 @@ function createInitialMemory() {
   return {
     tokens: null,
     jobs: [],
+    emailsByJob: {},
     lastChecked: null,
     processedIds: new Set(),
   };
@@ -23,9 +24,28 @@ function loadLocalMemory() {
     const raw = fs.readFileSync(localStorePath, "utf-8");
     const parsed = JSON.parse(raw);
 
+    const parsedJobs = Array.isArray(parsed.jobs)
+      ? parsed.jobs.map((job) => ({
+          ...job,
+          emails: Array.isArray(job.emails) ? job.emails : [],
+        }))
+      : [];
+
+    const parsedEmailsByJob =
+      parsed.emailsByJob && typeof parsed.emailsByJob === "object"
+        ? parsed.emailsByJob
+        : {};
+
+    for (const job of parsedJobs) {
+      if (Array.isArray(job.emails) && job.emails.length > 0) {
+        parsedEmailsByJob[job.id] = job.emails;
+      }
+    }
+
     return {
       tokens: parsed.tokens || null,
-      jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+      jobs: parsedJobs,
+      emailsByJob: parsedEmailsByJob,
       lastChecked: parsed.lastChecked || null,
       processedIds: new Set(Array.isArray(parsed.processedIds) ? parsed.processedIds : []),
     };
@@ -47,6 +67,7 @@ function saveLocalMemory(memory) {
         {
           tokens: memory.tokens,
           jobs: memory.jobs,
+          emailsByJob: memory.emailsByJob,
           lastChecked: memory.lastChecked,
           processedIds: Array.from(memory.processedIds),
         },
@@ -188,7 +209,10 @@ async function setLastChecked(lastChecked) {
 
 async function getJobs() {
   if (!supabase) {
-    return memory.jobs;
+    return memory.jobs.map((job) => ({
+      ...job,
+      emails: Array.isArray(job.emails) ? job.emails : [],
+    }));
   }
 
   const { data, error } = await supabase
@@ -215,15 +239,28 @@ async function getJobs() {
     imported: row.imported,
     source: row.source,
     createdAt: row.created_at,
+    emails: Array.isArray(memory.emailsByJob[row.id])
+      ? memory.emailsByJob[row.id]
+      : Array.isArray(row.emails)
+        ? row.emails
+        : [],
   }));
 }
 
 async function addJob(job) {
   if (!supabase) {
-    memory.jobs.push(job);
+    const normalizedJob = {
+      ...job,
+      emails: Array.isArray(job.emails) ? job.emails : [],
+    };
+
+    memory.jobs.push(normalizedJob);
     saveLocalMemory(memory);
     return;
   }
+
+  memory.emailsByJob[job.id] = Array.isArray(job.emails) ? job.emails : [];
+  saveLocalMemory(memory);
 
   const { error } = await supabase.from("jobs").insert({
     id: job.id,
@@ -254,11 +291,29 @@ async function updateJob(jobId, partialJob) {
         ? {
             ...job,
             ...partialJob,
+            emails:
+              partialJob.emails !== undefined
+                ? Array.isArray(partialJob.emails)
+                  ? partialJob.emails
+                  : []
+                : Array.isArray(job.emails)
+                  ? job.emails
+                  : [],
           }
         : job
     );
+
+    if (partialJob.emails !== undefined) {
+      memory.emailsByJob[jobId] = Array.isArray(partialJob.emails) ? partialJob.emails : [];
+    }
+
     saveLocalMemory(memory);
     return;
+  }
+
+  if (partialJob.emails !== undefined) {
+    memory.emailsByJob[jobId] = Array.isArray(partialJob.emails) ? partialJob.emails : [];
+    saveLocalMemory(memory);
   }
 
   const patch = {};
@@ -283,9 +338,13 @@ async function updateJob(jobId, partialJob) {
 async function deleteJob(jobId) {
   if (!supabase) {
     memory.jobs = memory.jobs.filter((job) => job.id !== jobId);
+    delete memory.emailsByJob[jobId];
     saveLocalMemory(memory);
     return;
   }
+
+  delete memory.emailsByJob[jobId];
+  saveLocalMemory(memory);
 
   const { error } = await supabase.from("jobs").delete().eq("id", jobId);
   if (error) {
@@ -350,6 +409,59 @@ async function markProcessedEmail(messageId) {
   }
 }
 
+async function getJobEmails(jobId) {
+  const jobs = await getJobs();
+  const job = jobs.find((item) => item.id === jobId);
+  if (!job) {
+    return null;
+  }
+
+  return Array.isArray(job.emails) ? job.emails : [];
+}
+
+async function addJobEmail(jobId, email) {
+  const jobs = await getJobs();
+  const job = jobs.find((item) => item.id === jobId);
+  if (!job) {
+    return null;
+  }
+
+  const existingEmails = Array.isArray(job.emails) ? job.emails : [];
+  const emailGmailId = email.gmailId || null;
+
+  const duplicateIndex = existingEmails.findIndex((item) => {
+    if (emailGmailId && item.gmailId) {
+      return item.gmailId === emailGmailId;
+    }
+    return item.id === email.id;
+  });
+
+  if (duplicateIndex >= 0) {
+    const current = existingEmails[duplicateIndex] || {};
+    const merged = {
+      ...current,
+      ...email,
+      body: String(email.body || "").trim() ? email.body : current.body,
+      preview: String(email.preview || "").trim() ? email.preview : current.preview,
+      isRead: Boolean(current.isRead || email.isRead),
+    };
+
+    const nextEmails = [...existingEmails];
+    nextEmails[duplicateIndex] = merged;
+    nextEmails.sort((first, second) => new Date(first.date).getTime() - new Date(second.date).getTime());
+
+    await updateJob(jobId, { emails: nextEmails });
+    return nextEmails;
+  }
+
+  const nextEmails = [...existingEmails, email].sort(
+    (first, second) => new Date(first.date).getTime() - new Date(second.date).getTime()
+  );
+
+  await updateJob(jobId, { emails: nextEmails });
+  return nextEmails;
+}
+
 module.exports = {
   getTokens,
   setTokens,
@@ -363,4 +475,6 @@ module.exports = {
   markJobImported,
   isProcessedEmail,
   markProcessedEmail,
+  getJobEmails,
+  addJobEmail,
 };
