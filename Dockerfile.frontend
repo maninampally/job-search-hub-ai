@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY client ./client
+
+RUN npm --prefix client install
+
+EXPOSE 5173
+
+CMD ["npm", "--prefix", "client", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
