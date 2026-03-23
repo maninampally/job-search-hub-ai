@@ -13,6 +13,11 @@ const env = {
     .filter(Boolean),
   EXTERNAL_API_TIMEOUT_MS: Number(process.env.EXTERNAL_API_TIMEOUT_MS || 12000),
   RETRY_ATTEMPTS: Number(process.env.RETRY_ATTEMPTS || 2),
+  INITIAL_SYNC_LOOKBACK_DAYS: Number(process.env.INITIAL_SYNC_LOOKBACK_DAYS || 180),
+  DAILY_SYNC_LOOKBACK_DAYS: Number(process.env.DAILY_SYNC_LOOKBACK_DAYS || 1),
+  GMAIL_SYNC_MAX_RESULTS_PER_PAGE: Number(process.env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE || 100),
+  INITIAL_SYNC_MAX_MESSAGES: Number(process.env.INITIAL_SYNC_MAX_MESSAGES || 1000),
+  SYNC_CRON: process.env.SYNC_CRON || "0 9 * * *",
 };
 
 module.exports = { env };
