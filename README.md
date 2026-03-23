@@ -37,6 +37,21 @@ npm run dev:client
 ### Deploy to Railway
 See docs/DEPLOYMENT.md for full step by step guide.
 
+### Run with Docker
+```bash
+# Ensure .env exists at project root
+docker compose up --build
+```
+
+App URLs:
+- Frontend: http://localhost:5173
+- Backend health: http://localhost:3001/health
+
+To stop:
+```bash
+docker compose down
+```
+
 ## Tech Stack
 - Frontend: React (organized under client/)
 - Backend: Node.js + Express
