@@ -279,6 +279,24 @@ button:disabled {
   align-items: center;
 }
 
+.chip.type-email {
+  background: #e6f1fb;
+  border-color: #c4ddf7;
+  color: #185fa5;
+}
+
+.chip.type-linkedin {
+  background: #ece8fb;
+  border-color: #d6cdf7;
+  color: #5a46b5;
+}
+
+.chip.type-whatsapp {
+  background: #e8f7ee;
+  border-color: #cdeed9;
+  color: #1d7a54;
+}
+
 .archive-panel {
   margin-top: 1rem;
   border: 1px solid #e1e6f0;
@@ -420,11 +438,278 @@ button:disabled {
   background: #fafcff;
 }
 
+.tracker-card.card-status-wishlist {
+  background: #e1e8f5;
+  border-color: #8ea0c4;
+}
+
+.tracker-card.card-status-applied {
+  background: #b7d8ff;
+  border-color: #3e86e8;
+}
+
+.tracker-card.card-status-screening {
+  background: #ffe39a;
+  border-color: #d39a10;
+}
+
+.tracker-card.card-status-interview {
+  background: #d8c9ff;
+  border-color: #7a58d6;
+}
+
+.tracker-card.card-status-offer {
+  background: #b6efcc;
+  border-color: #2f9d66;
+}
+
+.tracker-card.card-status-rejected {
+  background: #ffc3c3;
+  border-color: #cc4b4b;
+}
+
 .tracker-card header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
+}
+
+.tracker-card-header {
+  cursor: pointer;
+}
+
+.tracker-card-header:focus-visible {
+  outline: 2px solid #3e86e8;
+  outline-offset: 2px;
+}
+
+.tracker-card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.email-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.email-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2b78ff;
+  box-shadow: 0 0 0 0 rgba(43, 120, 255, 0.55);
+  animation: unreadPulse 1.6s infinite;
+}
+
+@keyframes unreadPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(43, 120, 255, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(43, 120, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(43, 120, 255, 0);
+  }
+}
+
+.email-thread-panel {
+  margin-top: 0.85rem;
+}
+
+.email-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-left: 1.1rem;
+}
+
+.email-timeline-line {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-border-tertiary, #d9deea);
+}
+
+.email-mini-card {
+  position: relative;
+  display: flex;
+  gap: 0.55rem;
+  background: #ffffff;
+  border: 0.5px solid #dbe1ed;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.email-mini-card.email-auto {
+  background: #fffbf0;
+  border-color: #f2c87a;
+}
+
+.email-mini-card.email-real {
+  background: #ffffff;
+}
+
+.email-timeline-dot-wrap {
+  position: relative;
+  z-index: 1;
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.email-timeline-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid #a0abc2;
+  background: #e9eef8;
+}
+
+.email-mini-content {
+  min-width: 0;
+  width: 100%;
+}
+
+.email-mini-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.email-sender-name {
+  margin: 0;
+  font-weight: 700;
+  color: #1f2a3c;
+}
+
+.email-sender-address {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #667188;
+}
+
+.email-date-text {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #667188;
+  text-align: right;
+}
+
+.email-subject {
+  margin: 0.32rem 0 0;
+  font-weight: 600;
+  color: #222f44;
+}
+
+.email-preview {
+  margin: 0.22rem 0 0.35rem;
+  color: #4f5d75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.email-modal-overlay {
+  margin-top: 0.8rem;
+  background: rgba(20, 26, 38, 0.7);
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.email-modal {
+  max-width: 560px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+  position: relative;
+}
+
+.email-modal-close {
+  position: absolute;
+  right: 0.55rem;
+  top: 0.35rem;
+  border: none;
+  background: transparent;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: #576178;
+}
+
+.email-modal-body {
+  margin: 0.7rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f8fafd;
+  border: 1px solid #e2e8f4;
+  border-radius: 8px;
+  padding: 0.7rem;
+  color: #223046;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.chip.email-real-badge {
+  background: #1f9e61;
+  border-color: #1a7f4f;
+  color: #ffffff;
+}
+
+.chip.email-auto-badge {
+  background: #bf7d00;
+  border-color: #996300;
+  color: #ffffff;
+}
+
+.chip.email-type-application,
+.email-timeline-dot.email-type-application {
+  background: #cde3ff;
+  border-color: #4a89de;
+  color: #194f9d;
+}
+
+.chip.email-type-recruiter,
+.email-timeline-dot.email-type-recruiter {
+  background: #d8d1ff;
+  border-color: #6b57c8;
+  color: #4b3a9a;
+}
+
+.chip.email-type-interview,
+.email-timeline-dot.email-type-interview {
+  background: #d5f3e2;
+  border-color: #2f9d66;
+  color: #1c7b4d;
+}
+
+.chip.email-type-rejection,
+.email-timeline-dot.email-type-rejection {
+  background: #ffd5d5;
+  border-color: #c74343;
+  color: #9e2424;
+}
+
+.chip.email-type-offer,
+.email-timeline-dot.email-type-offer {
+  background: #d6ffe2;
+  border-color: #2eab62;
+  color: #1f8248;
+}
+
+.chip.email-type-auto,
+.email-timeline-dot.email-type-auto {
+  background: #ffe9c2;
+  border-color: #bd8409;
+  color: #8f6200;
 }
 
 .tracker-card h4 {
@@ -442,6 +727,49 @@ button:disabled {
   padding: 0.15rem 0.5rem;
   font-size: 0.8rem;
   background: #fff;
+}
+
+.status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.chip.status-wishlist {
+  background: #5f7193;
+  border-color: #4f6182;
+  color: #ffffff;
+}
+
+.chip.status-applied {
+  background: #1f7ae0;
+  border-color: #1663b8;
+  color: #ffffff;
+}
+
+.chip.status-screening {
+  background: #b98500;
+  border-color: #8f6700;
+  color: #ffffff;
+}
+
+.chip.status-interview {
+  background: #6f49d1;
+  border-color: #5738a9;
+  color: #ffffff;
+}
+
+.chip.status-offer {
+  background: #1f9e61;
+  border-color: #1a7f4f;
+  color: #ffffff;
+}
+
+.chip.status-rejected {
+  background: #c73333;
+  border-color: #9f2828;
+  color: #ffffff;
 }
 
 .danger-btn {

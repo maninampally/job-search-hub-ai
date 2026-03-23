@@ -71,6 +71,20 @@ export async function markJobImported(jobId) {
 	return parseResponse(response);
 }
 
+export async function getJobEmails(jobId) {
+	const response = await fetch(`${BACKEND_URL}/jobs/${jobId}/emails`);
+	return parseResponse(response);
+}
+
+export async function addJobEmail(jobId, email) {
+	const response = await fetch(`${BACKEND_URL}/jobs/${jobId}/emails`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(email),
+	});
+	return parseResponse(response);
+}
+
 export async function getArchiveTemplateFiles() {
 	const response = await fetch(`${BACKEND_URL}/templates/archive/files`);
 	return parseResponse(response);
