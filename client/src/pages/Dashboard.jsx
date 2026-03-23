@@ -4,8 +4,6 @@ import {
   createJob,
   deleteJob,
   disconnectGmail,
-  getArchiveTemplateContent,
-  getArchiveTemplateFiles,
   getAuthStatus,
   getHealth,
   getJobs,
@@ -60,6 +58,26 @@ const DEMO_JOBS = [
 
 const PIPELINE_ORDER = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"];
 
+const STATUS_CHIP_CLASS = {
+  Wishlist: "status-wishlist",
+  Applied: "status-applied",
+  Screening: "status-screening",
+  Interview: "status-interview",
+  Offer: "status-offer",
+  Rejected: "status-rejected",
+};
+
+const EMAIL_TYPE_CLASS = {
+  "Application Confirmation": "email-type-application",
+  "Recruiter Outreach": "email-type-recruiter",
+  "Interview Scheduled": "email-type-interview",
+  Rejection: "email-type-rejection",
+  Offer: "email-type-offer",
+  "Auto / Tracking": "email-type-auto",
+};
+
+const EMAIL_READ_STORAGE_KEY = "jsa_v2";
+
 const NAV_ITEMS = [
   "Dashboard",
   "Job Tracker",
@@ -80,36 +98,123 @@ const CARD_ITEMS = [
 
 const CONTACT_RELATIONSHIPS = ["Recruiter", "Hiring Manager", "Employee", "Alumni", "Friend", "Other"];
 
-const TEMPLATE_ITEMS = [
+const TEMPLATES = [
   {
-    id: "tpl-1",
+    id: "t1",
+    case: "1",
+    name: "Email to Recruiter",
+    sub: "Job exists, not applied",
     type: "Email",
-    title: "Application Follow-up",
-    body: "Hi {name}, I recently applied for the {role} role at {company}. I am very interested and wanted to follow up on next steps.",
+    subject: "Data Engineer Role at [Company] — Manikanth Nampally",
+    body: "Hi [Recruiter Name],\n\nI came across the Data Engineer opening at [Company] and I’m excited about the opportunity. I have 2+ years building large-scale pipelines with Python, PySpark, Databricks, Airflow, Kafka, and AWS.\n\nI’m submitting my application and would love to connect.\n\nBest,\nManikanth Nampally",
   },
   {
-    id: "tpl-2",
+    id: "t2",
+    case: "1",
+    name: "Email to Hiring Manager",
+    sub: "Job exists, not applied",
+    type: "Email",
+    subject: "Data Engineer Opening at [Company] — Manikanth Nampally",
+    body: "Hi [Hiring Manager Name],\n\nI’m reaching out regarding the Data Engineer role on your team. My background in data lakehouse and streaming systems aligns well with this role.\n\nI’m applying today and would value a brief conversation.\n\nBest,\nManikanth Nampally",
+  },
+  {
+    id: "t3",
+    case: "1",
+    name: "LinkedIn 300 chars to Recruiter",
+    sub: "Job exists, not applied",
     type: "LinkedIn",
-    title: "Recruiter Outreach",
-    body: "Hi {name}, I’m a Data Engineer graduate student and saw the {role} opening at {company}. I’d love to connect and learn more.",
+    subject: "",
+    body: "Hi [Name], I saw the Data Engineer role at [Company] and I’m very interested. I have 2+ years building large-scale pipelines with PySpark, Databricks, and AWS. I’m applying today and would love to connect.",
   },
   {
-    id: "tpl-3",
+    id: "t4",
+    case: "1",
+    name: "LinkedIn Full to Recruiter",
+    sub: "Job exists, not applied",
+    type: "LinkedIn",
+    subject: "",
+    body: "Hi [Name],\n\nI came across the Data Engineer opening at [Company] and I’m excited to apply. I bring 2+ years of experience building 35+ TB/day pipelines with PySpark, Databricks, Airflow, Kafka, and AWS.\n\nWould love to connect and learn about next steps.\n\nManikanth",
+  },
+  {
+    id: "t5",
+    case: "1",
+    name: "LinkedIn 300 chars to Hiring Manager",
+    sub: "Job exists, not applied",
+    type: "LinkedIn",
+    subject: "",
+    body: "Hi [Name], I noticed the Data Engineer opening on your team at [Company]. My experience with PySpark, Databricks, Kafka, and AWS at scale maps closely to this role. I’m applying today and would appreciate connecting.",
+  },
+  {
+    id: "t6",
+    case: "1",
+    name: "LinkedIn Full to Hiring Manager",
+    sub: "Job exists, not applied",
+    type: "LinkedIn",
+    subject: "",
+    body: "Hi [Name],\n\nI’m interested in the Data Engineer role on your team at [Company]. I have hands-on experience with large-scale ETL/ELT and streaming systems using PySpark, Databricks, Airflow, Kafka, and AWS.\n\nI’m applying and would value a quick conversation.\n\nManikanth",
+  },
+  {
+    id: "t7",
+    case: "1",
+    name: "LinkedIn to Employee Referral",
+    sub: "Job exists, not applied",
+    type: "LinkedIn",
+    subject: "",
+    body: "Hey [Name], I found a Data Engineer opening at [Company] that matches my background well. Would you be open to sharing a referral link or referring me? I’d really appreciate your support.",
+  },
+  {
+    id: "t8",
+    case: "1",
+    name: "WhatsApp to Employee Referral",
+    sub: "Job exists, not applied",
     type: "WhatsApp",
-    title: "Referral Request",
-    body: "Hey {name}, hope you’re doing well. I found a {role} role at {company}. Could you guide me on referral steps if possible?",
+    subject: "",
+    body: "Hey [Name]! Hope you’re well. I found a Data Engineer opening at [Company]. Could you please share the referral link or refer me? It would really help. Thanks a lot!",
   },
   {
-    id: "tpl-4",
+    id: "t9",
+    case: "2",
+    name: "Email Follow Up to Recruiter",
+    sub: "Job exists, already applied",
     type: "Email",
-    title: "Thank You After Interview",
-    body: "Hi {name}, thank you for taking the time to speak with me today. I enjoyed our discussion and remain excited about the {role} opportunity.",
+    subject: "Following Up — Data Engineer Application",
+    body: "Hi [Recruiter Name],\n\nI wanted to follow up on my Data Engineer application submitted on [date]. I remain excited and would appreciate any update on next steps.\n\nBest,\nManikanth Nampally",
   },
   {
-    id: "tpl-5",
+    id: "t10",
+    case: "3",
+    name: "Cold Email to Recruiter",
+    sub: "No opening, cold outreach",
+    type: "Email",
+    subject: "Connecting — Data Engineer — Manikanth Nampally",
+    body: "Hi [Recruiter Name],\n\nI’ve been following [Company] and am impressed by your data platform work. I’d love to be considered for future Data Engineer opportunities and stay connected.\n\nBest,\nManikanth Nampally",
+  },
+  {
+    id: "t11",
+    case: "3",
+    name: "Cold LinkedIn to Recruiter",
+    sub: "No opening, cold outreach",
     type: "LinkedIn",
-    title: "Employee Connection",
-    body: "Hi {name}, I’m exploring data engineering roles at {company}. I’d appreciate connecting and learning about your experience there.",
+    subject: "",
+    body: "Hi [Name], I’ve been following [Company]’s data engineering work and would love to connect. I’m a Data Engineer with experience in PySpark, Databricks, Kafka, and AWS, and would appreciate being considered for future roles.",
+  },
+  {
+    id: "t12",
+    case: "4",
+    name: "LinkedIn Follow Up No Response",
+    sub: "No response follow up",
+    type: "LinkedIn",
+    subject: "",
+    body: "Hi [Name], following up on my previous note regarding Data Engineer opportunities at [Company]. I remain very interested and would appreciate connecting when convenient.",
+  },
+  {
+    id: "t13",
+    case: "4",
+    name: "Email Follow Up No Response",
+    sub: "No response follow up",
+    type: "Email",
+    subject: "Following Up — Data Engineer",
+    body: "Hi [Name],\n\nI’m following up on my earlier message regarding Data Engineer opportunities at [Company]. I remain very interested and would appreciate a quick update when possible.\n\nBest,\nManikanth Nampally",
   },
 ];
 
@@ -153,11 +258,7 @@ export function DashboardPage() {
   const [templateType, setTemplateType] = useState("All");
   const [templateSearch, setTemplateSearch] = useState("");
   const [expandedTemplate, setExpandedTemplate] = useState(null);
-  const [archiveFiles, setArchiveFiles] = useState([]);
-  const [archiveTemplates, setArchiveTemplates] = useState([]);
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [archiveSelectedPath, setArchiveSelectedPath] = useState("");
-  const [archiveContent, setArchiveContent] = useState("");
+  const [copiedTemplateId, setCopiedTemplateId] = useState(null);
   const [jobForm, setJobForm] = useState({
     company: "",
     role: "",
@@ -166,6 +267,9 @@ export function DashboardPage() {
     notes: "",
   });
   const [editingJobId, setEditingJobId] = useState(null);
+  const [expandedJobs, setExpandedJobs] = useState({});
+  const [activeEmailModal, setActiveEmailModal] = useState(null);
+  const [emailReadMap, setEmailReadMap] = useState({});
 
   const [interviewAnswers, setInterviewAnswers] = useState({});
   const [questionFilter, setQuestionFilter] = useState("All");
@@ -215,6 +319,80 @@ export function DashboardPage() {
     .filter((job) => ["Applied", "Screening", "Interview"].includes(job.status || ""))
     .slice(0, 3);
 
+  function getEmailIdentity(email) {
+    return email.gmailId || email.id;
+  }
+
+  function normalizeEmailItem(email) {
+    const identity = getEmailIdentity(email);
+    return {
+      id: email.id || identity || `email_${Math.random().toString(36).slice(2, 8)}`,
+      from: email.from || "",
+      fromName: email.fromName || email.from || "Unknown Sender",
+      subject: email.subject || "No subject",
+      preview: email.preview || "",
+      body: email.body || "",
+      date: email.date || new Date().toISOString(),
+      type: email.type || "Auto / Tracking",
+      isReal: Boolean(email.isReal),
+      gmailId: email.gmailId || "",
+      isRead: Boolean(emailReadMap[identity]) || Boolean(email.isRead),
+    };
+  }
+
+  function mergeEmails(currentEmails, incomingEmails) {
+    const byId = new Map();
+
+    for (const item of currentEmails || []) {
+      const normalized = normalizeEmailItem(item);
+      byId.set(getEmailIdentity(normalized) || normalized.id, normalized);
+    }
+
+    for (const item of incomingEmails || []) {
+      const normalized = normalizeEmailItem(item);
+      const identity = getEmailIdentity(normalized) || normalized.id;
+      if (!byId.has(identity)) {
+        byId.set(identity, normalized);
+      } else {
+        const existing = byId.get(identity);
+        byId.set(identity, {
+          ...existing,
+          ...normalized,
+          isRead: Boolean(existing.isRead || normalized.isRead),
+        });
+      }
+    }
+
+    return Array.from(byId.values()).sort(
+      (first, second) => new Date(first.date).getTime() - new Date(second.date).getTime()
+    );
+  }
+
+  function mergeJobsById(currentJobs, incomingJobs) {
+    const currentById = new Map((currentJobs || []).map((job) => [job.id, job]));
+    const merged = [];
+
+    for (const incomingJob of incomingJobs || []) {
+      const existing = currentById.get(incomingJob.id);
+      const mergedEmails = mergeEmails(existing?.emails || [], incomingJob.emails || []);
+      merged.push({
+        ...(existing || {}),
+        ...incomingJob,
+        emails: mergedEmails,
+      });
+      currentById.delete(incomingJob.id);
+    }
+
+    for (const leftover of currentById.values()) {
+      merged.push({
+        ...leftover,
+        emails: mergeEmails(leftover.emails || [], []),
+      });
+    }
+
+    return merged;
+  }
+
   async function loadDashboard() {
     setErrorText("");
     setSuccessText("");
@@ -235,7 +413,7 @@ export function DashboardPage() {
       );
       setConnected(Boolean(auth.connected));
       setLastChecked(jobsPayload.lastChecked || auth.lastChecked || null);
-      setJobs(jobsPayload.jobs || []);
+      setJobs((currentJobs) => mergeJobsById(currentJobs, jobsPayload.jobs || []));
       if (!auth.connected && (jobsPayload.jobs || []).length === 0) {
         setSuccessText("Connected UI is ready. Connect Gmail to start importing real jobs.");
       }
@@ -255,7 +433,7 @@ export function DashboardPage() {
 
     try {
       const payload = await syncJobs();
-      setJobs(payload.jobs || []);
+      setJobs((currentJobs) => mergeJobsById(currentJobs, payload.jobs || []));
       setLastChecked(payload.lastChecked || null);
       setSuccessText("Sync completed successfully.");
     } catch (error) {
@@ -309,6 +487,18 @@ export function DashboardPage() {
 
   useEffect(() => {
     try {
+      const savedReadState = window.localStorage.getItem(EMAIL_READ_STORAGE_KEY);
+      if (savedReadState) {
+        const parsed = JSON.parse(savedReadState);
+        if (parsed && typeof parsed === "object") {
+          setEmailReadMap(parsed);
+        }
+      }
+    } catch {
+      setEmailReadMap({});
+    }
+
+    try {
       const savedContacts = window.localStorage.getItem(CONTACTS_STORAGE_KEY);
       if (savedContacts) {
         const parsedContacts = JSON.parse(savedContacts);
@@ -359,18 +549,6 @@ export function DashboardPage() {
     loadDashboard();
   }, []);
 
-  useEffect(() => {
-    if (activeView !== "Templates") {
-      return;
-    }
-
-    if (archiveFiles.length > 0 || archiveLoading) {
-      return;
-    }
-
-    loadArchiveFiles();
-  }, [activeView]);
-
   function saveContacts(nextContacts) {
     setContacts(nextContacts);
     window.localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(nextContacts));
@@ -391,80 +569,73 @@ export function DashboardPage() {
     window.localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(nextReminders));
   }
 
-  async function loadArchiveFiles() {
-    setArchiveLoading(true);
-    setErrorText("");
-
-    try {
-      const payload = await getArchiveTemplateFiles();
-      const files = payload.files || [];
-      setArchiveFiles(files);
-
-      const loadedTemplates = await Promise.all(
-        files.map(async (file) => {
-          const filePath = String(file.path || "");
-          let content = "";
-
-          try {
-            const contentPayload = await getArchiveTemplateContent(filePath);
-            content = String(contentPayload.content || "");
-          } catch {
-            content = "";
-          }
-
-          const lowerPath = filePath.toLowerCase();
-          let type = "Other";
-          if (lowerPath.includes("email")) type = "Email";
-          if (lowerPath.includes("linkedin")) type = "LinkedIn";
-          if (lowerPath.includes("whatsapp")) type = "WhatsApp";
-
-          return {
-            id: `archive-${filePath}`,
-            source: "archive",
-            path: filePath,
-            title: filePath.split("/").pop() || filePath,
-            type,
-            body: content,
-          };
-        })
-      );
-
-      setArchiveTemplates(loadedTemplates);
-
-      if (files.length > 0 && !archiveSelectedPath) {
-        setArchiveSelectedPath(files[0].path);
-        const firstTemplate = loadedTemplates.find((item) => item.path === files[0].path);
-        if (firstTemplate) {
-          setArchiveContent(firstTemplate.body);
-        }
-      }
-
-      if (loadedTemplates.length > 0) {
-        setSuccessText("Archive templates integrated into Templates view.");
-      }
-    } catch (error) {
-      setErrorText(error.message || "Unable to load archived templates.");
-    } finally {
-      setArchiveLoading(false);
-    }
+  function saveEmailReadMap(nextReadMap) {
+    setEmailReadMap(nextReadMap);
+    window.localStorage.setItem(EMAIL_READ_STORAGE_KEY, JSON.stringify(nextReadMap));
   }
 
-  async function handleLoadArchiveContent() {
-    if (!archiveSelectedPath) {
-      setErrorText("Select a template file from archive.");
+  function markEmailAsRead(jobId, email) {
+    const identity = getEmailIdentity(email);
+    if (!identity) {
       return;
     }
 
-    setErrorText("");
-    setSuccessText("");
+    const nextReadMap = {
+      ...emailReadMap,
+      [identity]: true,
+    };
+    saveEmailReadMap(nextReadMap);
 
-    try {
-      const payload = await getArchiveTemplateContent(archiveSelectedPath);
-      setArchiveContent(payload.content || "");
-      setSuccessText("Archive template loaded exactly as stored.");
-    } catch (error) {
-      setErrorText(error.message || "Unable to load template content.");
+    setJobs((currentJobs) =>
+      currentJobs.map((job) => {
+        if (job.id !== jobId) {
+          return job;
+        }
+
+        return {
+          ...job,
+          emails: (job.emails || []).map((item) => {
+            if ((getEmailIdentity(item) || item.id) !== identity) {
+              return item;
+            }
+
+            return {
+              ...item,
+              isRead: true,
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function toggleJobExpanded(jobId) {
+    setExpandedJobs((current) => ({
+      ...current,
+      [jobId]: !current[jobId],
+    }));
+  }
+
+  function formatEmailDate(dateValue) {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return "Unknown date";
     }
+
+    return date.toLocaleString();
+  }
+
+  function getEmailTypeClass(type) {
+    return EMAIL_TYPE_CLASS[type] || "email-type-auto";
+  }
+
+  function handleEmailCardDoubleClick(jobId, email) {
+    markEmailAsRead(jobId, email);
+    setActiveEmailModal({ jobId, email });
+  }
+
+  function closeEmailModal() {
+    setActiveEmailModal(null);
   }
 
   function handleContactInput(field, value) {
@@ -795,6 +966,10 @@ export function DashboardPage() {
 
   const sortedReminders = [...reminders].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
+  function getStatusChipClass(status) {
+    return STATUS_CHIP_CLASS[status] || "status-wishlist";
+  }
+
   function renderDashboardView() {
     return (
       <>
@@ -975,51 +1150,162 @@ export function DashboardPage() {
           </select>
         </div>
 
-        <div className="job-list-grid">
-          {filteredJobs.map((job) => (
-            <article key={job.id} className="tracker-card">
-              <header>
-                <h4>{job.role || "Unknown Role"}</h4>
-                <span className="chip">{job.status || "Wishlist"}</span>
-              </header>
-              <p>
-                <strong>{job.company || "Unknown Company"}</strong>
-              </p>
-              <p>{job.location || "Location not set"}</p>
-              <p>{job.recruiterName || "Recruiter not available"}</p>
-              <div className="control-row">
-                <select
-                  value={job.status || "Wishlist"}
-                  onChange={(event) => handleStatusChange(job.id, event.target.value)}
-                  disabled={isDemoMode}
-                >
-                  {PIPELINE_ORDER.map((status) => (
-                    <option key={`${job.id}-${status}`} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => handleEditJob(job)} disabled={isDemoMode}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(job.imported) || isDemoMode}
-                  onClick={() => handleMarkImported(job.id)}
-                >
-                  {job.imported ? "Imported" : "Mark Imported"}
-                </button>
-                <button
-                  type="button"
-                  className="danger-btn"
-                  disabled={isDemoMode}
-                  onClick={() => handleDelete(job.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </article>
+        <div className="status-legend">
+          {PIPELINE_ORDER.map((status) => (
+            <span key={`legend-${status}`} className={`chip ${getStatusChipClass(status)}`}>
+              {status}
+            </span>
           ))}
+        </div>
+
+        <div className="job-list-grid">
+          {filteredJobs.map((job) => {
+            const emails = mergeEmails([], job.emails || []);
+            const isExpanded = Boolean(expandedJobs[job.id]);
+            const hasUnreadRealEmail = emails.some((email) => email.isReal && !email.isRead);
+
+            return (
+              <article
+                key={job.id}
+                className={`tracker-card card-${getStatusChipClass(job.status || "Wishlist")}`}
+              >
+                <header
+                  className="tracker-card-header"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleJobExpanded(job.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      toggleJobExpanded(job.id);
+                    }
+                  }}
+                >
+                  <div>
+                    <h4>{job.role || "Unknown Role"}</h4>
+                    <p>
+                      <strong>{job.company || "Unknown Company"}</strong>
+                    </p>
+                    <p>{job.location || "Location not set"}</p>
+                    <p>Applied: {job.appliedDate || "Unknown"}</p>
+                  </div>
+                  <div className="tracker-card-badges">
+                    <span className={`chip ${getStatusChipClass(job.status || "Wishlist")}`}>
+                      {job.status || "Wishlist"}
+                    </span>
+                    <span className="chip email-count-badge">
+                      {emails.length} emails
+                      {hasUnreadRealEmail && <span className="email-unread-dot" />}
+                    </span>
+                  </div>
+                </header>
+
+                {isExpanded && (
+                  <>
+                    <p>{job.recruiterName || "Recruiter not available"}</p>
+
+                    <div className="email-thread-panel">
+                      {emails.length === 0 ? (
+                        <p className="muted">No emails yet — will auto-populate from Gmail</p>
+                      ) : (
+                        <div className="email-timeline">
+                          <div className="email-timeline-line" />
+                          {emails.map((email) => (
+                            <article
+                              key={getEmailIdentity(email) || email.id}
+                              className={`email-mini-card ${email.isReal ? "email-real" : "email-auto"}`}
+                              onDoubleClick={() => handleEmailCardDoubleClick(job.id, email)}
+                              title="Double-click to read full email"
+                            >
+                              <div className="email-timeline-dot-wrap">
+                                <span className={`email-timeline-dot ${getEmailTypeClass(email.type)}`} />
+                              </div>
+                              <div className="email-mini-content">
+                                <div className="email-mini-top">
+                                  <div>
+                                    <p className="email-sender-name">{email.fromName || "Unknown Sender"}</p>
+                                    <p className="email-sender-address">{email.from || ""}</p>
+                                  </div>
+                                  <p className="email-date-text">{formatEmailDate(email.date)}</p>
+                                </div>
+                                <p className="email-subject">{email.subject || "No subject"}</p>
+                                <p className="email-preview">{email.body || email.preview || "No message available"}</p>
+                                <div className="control-row">
+                                  <span className={`chip ${getEmailTypeClass(email.type)}`}>
+                                    {email.type || "Auto / Tracking"}
+                                  </span>
+                                  <span className={`chip ${email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
+                                    {email.isReal ? "Real email" : "Auto / Tracking email"}
+                                  </span>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {activeEmailModal && activeEmailModal.jobId === job.id && (
+                      <div className="email-modal-overlay" onClick={closeEmailModal}>
+                        <section className="email-modal" onClick={(event) => event.stopPropagation()}>
+                          <button type="button" className="email-modal-close" onClick={closeEmailModal}>
+                            ×
+                          </button>
+                          <h3>{activeEmailModal.email.subject || "No subject"}</h3>
+                          <p>
+                            <strong>{activeEmailModal.email.fromName || "Unknown Sender"}</strong>
+                          </p>
+                          <p>{activeEmailModal.email.from || ""}</p>
+                          <p className="muted">{formatEmailDate(activeEmailModal.email.date)}</p>
+                          <div className="control-row">
+                            <span className={`chip ${getEmailTypeClass(activeEmailModal.email.type)}`}>
+                              {activeEmailModal.email.type || "Auto / Tracking"}
+                            </span>
+                            <span className={`chip ${activeEmailModal.email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
+                              {activeEmailModal.email.isReal ? "Real email" : "Auto / Tracking email"}
+                            </span>
+                          </div>
+                          <pre className="email-modal-body">{activeEmailModal.email.body || "No body text available"}</pre>
+                        </section>
+                      </div>
+                    )}
+
+                    <div className="control-row">
+                      <select
+                        value={job.status || "Wishlist"}
+                        onChange={(event) => handleStatusChange(job.id, event.target.value)}
+                        disabled={isDemoMode}
+                      >
+                        {PIPELINE_ORDER.map((status) => (
+                          <option key={`${job.id}-${status}`} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => handleEditJob(job)} disabled={isDemoMode}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(job.imported) || isDemoMode}
+                        onClick={() => handleMarkImported(job.id)}
+                      >
+                        {job.imported ? "Imported" : "Mark Imported"}
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        disabled={isDemoMode}
+                        onClick={() => handleDelete(job.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
+            );
+          })}
           {filteredJobs.length === 0 && <p className="muted">No jobs match the current filters.</p>}
         </div>
       </section>
@@ -1139,21 +1425,30 @@ export function DashboardPage() {
     );
   }
 
-  async function handleCopyTemplate(templateBody) {
+  async function handleCopyTemplate(template) {
     setErrorText("");
     setSuccessText("");
 
     try {
+      const contentToCopy =
+        template.type === "Email" && template.subject
+          ? `Subject: ${template.subject}\n\n${template.body}`
+          : template.body;
+
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(templateBody);
+        await navigator.clipboard.writeText(contentToCopy);
       } else {
         const textarea = document.createElement("textarea");
-        textarea.value = templateBody;
+        textarea.value = contentToCopy;
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
+      setCopiedTemplateId(template.id);
+      setTimeout(() => {
+        setCopiedTemplateId((current) => (current === template.id ? null : current));
+      }, 2000);
       setSuccessText("Template copied to clipboard.");
     } catch {
       setErrorText("Unable to copy template. Please copy manually.");
@@ -1171,14 +1466,9 @@ export function DashboardPage() {
   }
 
   function renderTemplatesView() {
-    const templateSource =
-      archiveTemplates.length > 0
-        ? archiveTemplates
-        : TEMPLATE_ITEMS.map((template) => ({ ...template, source: "local" }));
-
-    const filteredTemplates = templateSource.filter((template) => {
+    const filteredTemplates = TEMPLATES.filter((template) => {
       const typeMatch = templateType === "All" ? true : template.type === templateType;
-      const searchText = `${template.title || ""} ${template.body || ""} ${template.path || ""}`.toLowerCase();
+      const searchText = `${template.name || ""} ${template.sub || ""} ${template.body || ""} case ${template.case}`.toLowerCase();
       const searchMatch =
         !templateSearch.trim() || searchText.includes(templateSearch.trim().toLowerCase());
       return typeMatch && searchMatch;
@@ -1189,11 +1479,7 @@ export function DashboardPage() {
         <header className="module-header">
           <div>
             <h1>Templates</h1>
-            <p>
-              {archiveTemplates.length > 0
-                ? "Browsing integrated archive templates with exact content."
-                : "Browsing local fallback templates. Use Reload Files to integrate archive."}
-            </p>
+            <p>Browse clean template cards by type, case, and scenario.</p>
           </div>
         </header>
 
@@ -1217,18 +1503,27 @@ export function DashboardPage() {
         <div className="templates-grid">
           {filteredTemplates.map((template) => {
             const isExpanded = expandedTemplate === template.id;
-            const cleanTitle = normalizeTemplateText(template.title || "Template");
-            const cleanBody = template.source === "archive"
-              ? String(template.body || "")
-              : normalizeTemplateText(template.body || "");
+            const cleanBody = normalizeTemplateText(template.body || "");
+            const typeClass =
+              template.type === "Email"
+                ? "type-email"
+                : template.type === "LinkedIn"
+                  ? "type-linkedin"
+                  : "type-whatsapp";
+
             return (
               <article key={template.id} className="template-card">
                 <header>
                   <div>
-                    <h4>{template.source === "archive" ? (template.path || cleanTitle) : cleanTitle}</h4>
-                    <span className="chip">{template.type} · {template.source === "archive" ? "Archive" : "Local"}</span>
+                    <h4>{template.name}</h4>
+                    <p className="muted">Case {template.case} · {template.sub}</p>
+                    <span className={`chip ${typeClass}`}>{template.type}</span>
                   </div>
                 </header>
+
+                {template.type === "Email" && template.subject && (
+                  <p className="muted"><strong>Subject:</strong> {template.subject}</p>
+                )}
 
                 <p className="muted">
                   {isExpanded ? cleanBody : `${cleanBody.slice(0, 170)}...`}
