@@ -1,0 +1,20 @@
+Subject: Data Engineer Role at [Company] - Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I came across the Data Engineer opening at [Company] and I am genuinely excited about this opportunity. The role aligns perfectly with the work I have been doing and I wanted to reach out directly before submitting my application.
+
+I am a Data Engineer with 2+ years of experience at LTIMindtree where I built enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026. I also hold AWS Certified Cloud Practitioner and AWS Certified AI Practitioner certifications.
+
+The work [Company] is doing around [mention something specific about their tech stack or data platform] is exactly the kind of environment I am looking to grow in and contribute to.
+
+I am submitting my application today and I would love the opportunity to connect and walk you through how my experience maps to what the team is building. I have attached my resume for your reference.
+
+Looking forward to hearing from you!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+LinkedIn: [Your LinkedIn URL]
+Portfolio: [Your Portfolio URL]

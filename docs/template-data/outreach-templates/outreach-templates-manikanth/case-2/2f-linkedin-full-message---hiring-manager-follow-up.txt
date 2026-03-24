@@ -1,0 +1,11 @@
+Hi [Name],
+
+I hope you are doing well! I recently applied for the Data Engineer role on your team at [Company] and wanted to follow up directly with you.
+
+I am genuinely excited about the work your team is doing and I am confident that my experience building 35+ TB/day lakehouse pipelines using PySpark, Spark, Databricks, Airflow, Kafka and AWS maps well to what the role requires. I am completing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+I would love a brief conversation to share how I can contribute to your team. Looking forward to connecting!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494

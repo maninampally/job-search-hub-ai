@@ -10,6 +10,7 @@ function createInitialMemory() {
     tokens: null,
     jobs: [],
     emailsByJob: {},
+    statusTimelineByJob: {},
     lastChecked: null,
     processedIds: new Set(),
   };
@@ -35,6 +36,10 @@ function loadLocalMemory() {
       parsed.emailsByJob && typeof parsed.emailsByJob === "object"
         ? parsed.emailsByJob
         : {};
+    const parsedTimelineByJob =
+      parsed.statusTimelineByJob && typeof parsed.statusTimelineByJob === "object"
+        ? parsed.statusTimelineByJob
+        : {};
 
     for (const job of parsedJobs) {
       if (Array.isArray(job.emails) && job.emails.length > 0) {
@@ -46,6 +51,7 @@ function loadLocalMemory() {
       tokens: parsed.tokens || null,
       jobs: parsedJobs,
       emailsByJob: parsedEmailsByJob,
+      statusTimelineByJob: parsedTimelineByJob,
       lastChecked: parsed.lastChecked || null,
       processedIds: new Set(Array.isArray(parsed.processedIds) ? parsed.processedIds : []),
     };
@@ -68,6 +74,7 @@ function saveLocalMemory(memory) {
           tokens: memory.tokens,
           jobs: memory.jobs,
           emailsByJob: memory.emailsByJob,
+          statusTimelineByJob: memory.statusTimelineByJob,
           lastChecked: memory.lastChecked,
           processedIds: Array.from(memory.processedIds),
         },
@@ -83,6 +90,36 @@ function saveLocalMemory(memory) {
 const memory = {
   ...loadLocalMemory(),
 };
+
+function recordStatusTimelineEntry(jobId, fromStatus, toStatus, source = "system") {
+  if (!jobId || !toStatus) {
+    return;
+  }
+
+  if (!memory.statusTimelineByJob || typeof memory.statusTimelineByJob !== "object") {
+    memory.statusTimelineByJob = {};
+  }
+
+  const currentEntries = Array.isArray(memory.statusTimelineByJob[jobId])
+    ? memory.statusTimelineByJob[jobId]
+    : [];
+
+  const nextEntry = {
+    id: `timeline_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    fromStatus: fromStatus || null,
+    toStatus,
+    source,
+    changedAt: new Date().toISOString(),
+  };
+
+  memory.statusTimelineByJob[jobId] = [...currentEntries, nextEntry];
+  saveLocalMemory(memory);
+}
+
+async function getJobStatusTimeline(jobId) {
+  const entries = memory.statusTimelineByJob?.[jobId];
+  return Array.isArray(entries) ? entries : [];
+}
 
 const hasSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -255,11 +292,13 @@ async function addJob(job) {
     };
 
     memory.jobs.push(normalizedJob);
+    recordStatusTimelineEntry(normalizedJob.id, null, normalizedJob.status || "Applied", "create_job");
     saveLocalMemory(memory);
     return;
   }
 
   memory.emailsByJob[job.id] = Array.isArray(job.emails) ? job.emails : [];
+  recordStatusTimelineEntry(job.id, null, job.status || "Applied", "create_job");
   saveLocalMemory(memory);
 
   const { error } = await supabase.from("jobs").insert({
@@ -285,6 +324,9 @@ async function addJob(job) {
 }
 
 async function updateJob(jobId, partialJob) {
+  const existingJobs = await getJobs();
+  const previousJob = existingJobs.find((job) => job.id === jobId);
+
   if (!supabase) {
     memory.jobs = memory.jobs.map((job) =>
       job.id === jobId
@@ -307,6 +349,10 @@ async function updateJob(jobId, partialJob) {
       memory.emailsByJob[jobId] = Array.isArray(partialJob.emails) ? partialJob.emails : [];
     }
 
+    if (partialJob.status !== undefined && previousJob && previousJob.status !== partialJob.status) {
+      recordStatusTimelineEntry(jobId, previousJob.status || null, partialJob.status, "update_job");
+    }
+
     saveLocalMemory(memory);
     return;
   }
@@ -314,6 +360,10 @@ async function updateJob(jobId, partialJob) {
   if (partialJob.emails !== undefined) {
     memory.emailsByJob[jobId] = Array.isArray(partialJob.emails) ? partialJob.emails : [];
     saveLocalMemory(memory);
+  }
+
+  if (partialJob.status !== undefined && previousJob && previousJob.status !== partialJob.status) {
+    recordStatusTimelineEntry(jobId, previousJob.status || null, partialJob.status, "update_job");
   }
 
   const patch = {};
@@ -339,11 +389,13 @@ async function deleteJob(jobId) {
   if (!supabase) {
     memory.jobs = memory.jobs.filter((job) => job.id !== jobId);
     delete memory.emailsByJob[jobId];
+    delete memory.statusTimelineByJob[jobId];
     saveLocalMemory(memory);
     return;
   }
 
   delete memory.emailsByJob[jobId];
+  delete memory.statusTimelineByJob[jobId];
   saveLocalMemory(memory);
 
   const { error } = await supabase.from("jobs").delete().eq("id", jobId);
@@ -477,4 +529,5 @@ module.exports = {
   markProcessedEmail,
   getJobEmails,
   addJobEmail,
+  getJobStatusTimeline,
 };

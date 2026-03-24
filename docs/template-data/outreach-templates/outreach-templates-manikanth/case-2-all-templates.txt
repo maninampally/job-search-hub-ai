@@ -1,0 +1,122 @@
+CASE 2 — JOB OPENING EXISTS, ALREADY APPLIED
+============================================================
+
+--- Email Follow Up — Recruiter [Email] ---
+Subject: Following Up — Data Engineer Application — Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I hope you are doing well! I wanted to follow up on my application for the Data Engineer role at [Company] which I submitted on [date].
+
+I am really excited about this opportunity and remain very confident that my experience in PySpark, Spark, Databricks and large scale AWS pipeline engineering is a strong fit for what your team is building.
+
+I would love the chance to connect and discuss how my background can add value. Please find my resume attached for your reference.
+
+Looking forward to hearing from you!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- Email Follow Up — Hiring Manager [Email] ---
+Subject: Following Up — Data Engineer Application — Manikanth Nampally
+
+Hi [Hiring Manager Name],
+
+I hope you are doing well! I wanted to follow up on my application for the Data Engineer role on your team at [Company], submitted on [date].
+
+I remain very excited about this opportunity. The work your team is doing around [mention something specific] is exactly where I want to contribute, and I am confident my hands on experience with PySpark, Databricks, Kafka, and AWS scale pipelines makes me a strong fit.
+
+I would love a brief conversation to share how my background aligns with what your team is building. I have attached my resume for your reference.
+
+Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Recruiter Follow Up [LinkedIn] ---
+
+Hi [Name], I wanted to follow up on my Data Engineer application at [Company] submitted on [date]. I remain really excited about this opportunity and confident my background in PySpark, Databricks and AWS scale pipelines is a strong match. Would love to connect!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Recruiter Follow Up [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing great! I wanted to follow up on my Data Engineer application at [Company] which I submitted on [date].
+
+I am genuinely very excited about this opportunity and remain confident that my 2+ years of experience building enterprise scale pipelines processing 35+ TB of data daily using PySpark, Spark, Databricks, Airflow, Kafka, and AWS is a strong fit for what the team needs.
+
+I would love to connect and learn more about the role and next steps. Looking forward to hearing from you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Hiring Manager Follow Up [LinkedIn] ---
+
+Hi [Name], I applied for the Data Engineer role on your team at [Company] on [date] and wanted to follow up directly. I am really excited about contributing to your data platform and confident my experience is a strong match. Would love to connect!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Hiring Manager Follow Up [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing well! I recently applied for the Data Engineer role on your team at [Company] and wanted to follow up directly with you.
+
+I am genuinely excited about the work your team is doing and I am confident that my experience building 35+ TB/day lakehouse pipelines using PySpark, Spark, Databricks, Airflow, Kafka and AWS maps well to what the role requires. I am completing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+I would love a brief conversation to share how I can contribute to your team. Looking forward to connecting!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn to Employee — Push Application [LinkedIn] ---
+
+Hey [Name],
+
+Hope you are doing great! I wanted to let you know I applied for the Data Engineer role at [Company] on [date] and I am really excited about this opportunity.
+
+I would really appreciate it if you could put in a good word or give my application a push internally. I am really confident this is the right role for me and your support would mean a great deal.
+
+I am a Data Engineer with 2+ years of experience building 35+ TB/day pipelines at LTIMindtree, completing my MS at FAU with a 3.9 GPA, graduating May 2026. Resume attached for your reference.
+
+Looking forward to your support and would love to catch up soon!
+
+Manikanth
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- WhatsApp to Employee — Push Application [WhatsApp] ---
+
+Hey [Name]!
+
+Hope you are doing awesome! Just wanted to let you know I applied for the Data Engineer role at [Company] and I am really excited about it.
+
+Would really appreciate it if you could put in a good word for me internally or give my application a push. I am really confident about this one and your support would make a big difference!
+
+Quick snapshot: 2+ years at LTIMindtree building pipelines at 35+ TB/day using PySpark, Spark, Databricks, Airflow, Kafka and AWS. Finishing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+Looking forward to your support! Would love to catch up soon too.
+
+Manikanth
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+

@@ -1,0 +1,16 @@
+Subject: Connecting — Data Engineer — Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I hope you are doing well! I have been following [Company] and I am really impressed by the data engineering work your team is doing, especially around [mention something specific about their tech stack, product, or a recent blog post].
+
+I wanted to reach out and introduce myself. I am a Data Engineer with 2+ years of experience at LTIMindtree building enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and hold two AWS certifications.
+
+I would love to stay connected and be considered for any Data Engineer openings that come up on your team.
+
+I have attached my resume for your reference. Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494

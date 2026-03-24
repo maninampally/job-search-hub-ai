@@ -1,0 +1,8 @@
+Hi [Name],
+
+I wanted to follow up on my message from last week about the Data Engineer role on your team at [Company]. I remain genuinely excited about this opportunity and the work your team is building.
+
+I would love a brief conversation to share how my experience in PySpark, Databricks, Kafka and AWS pipelines at 35+ TB scale can contribute to your team. Looking forward to connecting!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com | +1 (561) 542-6494

@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY server ./server
+COPY docs ./docs
 
 RUN npm install --omit=dev
 
