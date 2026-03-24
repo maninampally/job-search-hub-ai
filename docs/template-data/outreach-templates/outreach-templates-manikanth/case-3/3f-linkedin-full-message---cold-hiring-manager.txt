@@ -1,0 +1,11 @@
+Hi [Name],
+
+I hope you are doing well! I have been following [Company]'s data engineering work and I am genuinely impressed by what your team is building around [mention something specific].
+
+I am a Data Engineer with 2+ years of experience building 35+ TB/day lakehouse pipelines at LTIMindtree using PySpark, Spark, Databricks, Airflow, Kafka and AWS. I am completing my MS at Florida Atlantic University with a 3.9 GPA, graduating May 2026.
+
+Even though there may not be a current opening, I would love to stay connected and be considered when a Data Engineer role comes up on your team.
+
+Looking forward to connecting!
+Manikanth Nampally
+manikanthnampally94@gmail.com | +1 (561) 542-6494

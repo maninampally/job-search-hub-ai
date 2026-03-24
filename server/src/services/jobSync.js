@@ -20,6 +20,21 @@ const GMAIL_QUERY_BASE =
 
 const STATUS_PROGRESSION = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"];
 
+async function refreshTokensIfExpired(tokens) {
+  if (!tokens || !tokens.expiry_date || tokens.expiry_date >= Date.now()) {
+    return tokens;
+  }
+
+  const { credentials } = await oauth2Client.refreshAccessToken();
+  const nextTokens = {
+    ...tokens,
+    ...credentials,
+  };
+  await setTokens(nextTokens);
+  console.log("[sync] refreshed Gmail OAuth token");
+  return nextTokens;
+}
+
 function parseSender(fromHeader) {
   const raw = String(fromHeader || "").trim();
   const matched = raw.match(/^(.*)<([^>]+)>$/);
@@ -360,103 +375,79 @@ function buildSyncQuery(lastChecked, forceInitialSync = false) {
 }
 
 async function processEmail(gmail, messageId) {
-  try {
-    const { subject, from, date, body } = await fetchMessageDetails(gmail, messageId);
-    const { fromName, fromEmail } = parseSender(from);
-    const originalBody = String(body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-    const displayBody = cleanEmailBodyForDisplay(originalBody);
-    const compactBody = compactForExtraction(originalBody);
-    const preview = compactForExtraction(displayBody).slice(0, 180);
+  const { subject, from, date, body } = await fetchMessageDetails(gmail, messageId);
+  const { fromName, fromEmail } = parseSender(from);
+  const originalBody = String(body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  const displayBody = cleanEmailBodyForDisplay(originalBody);
+  const compactBody = compactForExtraction(originalBody);
+  const preview = compactForExtraction(displayBody).slice(0, 180);
 
-    if (!compactBody || compactBody.length < 20) {
-      return;
-    }
-
-    const extracted = await extractJobInfo({
-      subject,
-      from,
-      date,
-      body: compactBody.slice(0, 3000),
-    });
-
-    if (!extracted || !extracted.isJobRelated) {
-      return;
-    }
-
-    if (!extracted.appliedDate) {
-      extracted.appliedDate = Number.isNaN(new Date(date).getTime())
-        ? new Date().toISOString().slice(0, 10)
-        : new Date(date).toISOString().slice(0, 10);
-    }
-
-    extracted.status = normalizeStatus(extracted.status);
-
-    const emailType = extracted.emailType || classifyFallbackEmailType(subject, fromEmail);
-    const isReal =
-      typeof extracted.isReal === "boolean"
-        ? extracted.isReal
-        : classifyFallbackIsReal(fromEmail, emailType);
-
-    const emailPayload = {
-      id: `email_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      from: fromEmail || from,
-      fromName: fromName || fromEmail || "Unknown Sender",
-      subject,
-      preview,
-      body: displayBody || originalBody,
-      date: Number.isNaN(new Date(date).getTime())
-        ? new Date().toISOString()
-        : new Date(date).toISOString(),
-      type: emailType,
-      isReal,
-      gmailId: messageId,
-      isRead: false,
-    };
-
-    const jobs = await getJobs();
-    const matchedJob = jobs.find((job) => sameCompanyRole(job, extracted));
-
-    if (matchedJob) {
-      await updateJobStatus(matchedJob, extracted, emailPayload);
-      return;
-    }
-
-    if (extracted.status !== "Applied") {
-      const baseJob = {
-        id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        company: extracted.company,
-        role: extracted.role,
-        status: "Applied",
-        location: extracted.location,
-        recruiterName: extracted.recruiterName,
-        recruiterEmail: extracted.recruiterEmail,
-        appliedDate: extracted.appliedDate,
-        notes: "Applied status inferred from a later status email.",
-        nextStep: extracted.nextStep,
-        emailId: messageId,
-        emails: [],
-        createdAt: new Date().toISOString(),
-        source: "gmail",
-      };
-
-      await addJob(baseJob);
-      await updateJobStatus(baseJob, extracted, emailPayload);
-      console.log(`Added: ${extracted.company} — ${extracted.role}`);
-      return;
-    }
-
-    await addJob({
-      id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      ...extracted,
-      emailId: messageId,
-      emails: [emailPayload],
-      createdAt: new Date().toISOString(),
-      source: "gmail",
-    });
-    console.log(`Added: ${extracted.company} — ${extracted.role}`);
-  } catch (error) {
-    console.error("Process email error:", error.message);
+  if (!compactBody || compactBody.length < 20) {
+    return;
   }
+
+  const extracted = await extractJobInfo({
+    subject,
+    from,
+    date,
+    body: compactBody.slice(0, 3000),
+  });
+
+  if (!extracted || !extracted.isJobRelated) {
+    return;
+  }
+
+  if (!extracted.appliedDate) {
+    extracted.appliedDate = Number.isNaN(new Date(date).getTime())
+      ? new Date().toISOString().slice(0, 10)
+      : new Date(date).toISOString().slice(0, 10);
+  }
+
+  extracted.status = normalizeStatus(extracted.status);
+
+  const emailType = extracted.emailType || classifyFallbackEmailType(subject, fromEmail);
+  const isReal =
+    typeof extracted.isReal === "boolean"
+      ? extracted.isReal
+      : classifyFallbackIsReal(fromEmail, emailType);
+
+  const emailPayload = {
+    id: `email_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    from: fromEmail || from,
+    fromName: fromName || fromEmail || "Unknown Sender",
+    subject,
+    preview,
+    body: displayBody || originalBody,
+    date: Number.isNaN(new Date(date).getTime())
+      ? new Date().toISOString()
+      : new Date(date).toISOString(),
+    type: emailType,
+    isReal,
+    gmailId: messageId,
+    isRead: false,
+  };
+
+  const jobs = await getJobs();
+  const matchedJob = jobs.find((job) => sameCompanyRole(job, extracted));
+
+  if (matchedJob) {
+    await updateJobStatus(matchedJob, extracted, emailPayload);
+    return;
+  }
+
+  await addJob({
+    id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    ...extracted,
+    emailId: messageId,
+    emails: [emailPayload],
+    createdAt: new Date().toISOString(),
+    source: "gmail",
+    notes:
+      extracted.status !== "Applied"
+        ? (extracted.notes || "Applied status inferred from a later status email.")
+        : extracted.notes,
+  });
+  console.log(`Added: ${extracted.company} — ${extracted.role}`);
 }
 
 async function backfillJobEmailsFromExistingJobs() {
@@ -512,15 +503,52 @@ async function backfillJobEmailsFromExistingJobs() {
   return { updated, scanned };
 }
 
+async function processMessagesWithQueue(gmail, messages) {
+  const concurrency = Math.max(1, Number(env.SYNC_PROCESSING_CONCURRENCY || 1));
+  const queue = [...messages];
+  let processed = 0;
+
+  async function worker() {
+    while (queue.length > 0) {
+      const msg = queue.shift();
+      if (!msg) {
+        continue;
+      }
+
+      try {
+        await processEmail(gmail, msg.id);
+        await markProcessedEmail(msg.id);
+        processed += 1;
+      } catch (error) {
+        console.error(`[sync] message processing failed: gmailId=${msg.id}`, error.message);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, queue.length || 1) }, () => worker());
+  await Promise.all(workers);
+  return processed;
+}
+
 async function fetchJobEmails(options = {}) {
   const forceInitialSync = options.mode === "initial";
-  const tokens = await getTokens();
-  if (!tokens) {
+  const storedTokens = await getTokens();
+  if (!storedTokens) {
     console.log("[sync] skipped: gmail not connected");
     return;
   }
 
-  const gmail = createGmailClient(tokens);
+  let activeTokens = storedTokens;
+  try {
+    activeTokens = await refreshTokensIfExpired(storedTokens);
+  } catch (error) {
+    console.error("[sync] token refresh failed:", error.message);
+    return;
+  }
+
+  const gmail = createGmailClient(activeTokens);
   const startedAt = Date.now();
   const previousLastChecked = await getLastChecked();
   const query = buildSyncQuery(previousLastChecked, forceInitialSync);
@@ -571,23 +599,13 @@ async function fetchJobEmails(options = {}) {
       }
     }
 
-    for (const msg of newMessages) {
-      await processEmail(gmail, msg.id);
-      await markProcessedEmail(msg.id);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+    const processedCount = await processMessagesWithQueue(gmail, newMessages);
 
     const checkedAt = new Date().toISOString();
     await setLastChecked(checkedAt);
 
-    if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      await setTokens(credentials);
-      console.log("[sync] refreshed Gmail OAuth token");
-    }
-
     console.log(
-      `[sync] completed: scanned=${limitedMessages.length}, processed=${newMessages.length}, query=\"${query}\", durationMs=${Date.now() - startedAt}`
+      `[sync] completed: scanned=${limitedMessages.length}, processed=${processedCount}, queued=${newMessages.length}, query="${query}", durationMs=${Date.now() - startedAt}`
     );
   } catch (error) {
     console.error("[sync] failed:", error.message);

@@ -1,0 +1,13 @@
+Hi [Name],
+
+I hope you are doing great! I came across the Data Engineer opening at [Company] and I am genuinely thrilled about this opportunity.
+
+I am a Data Engineer with 2+ years of hands on experience building enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS at LTIMindtree. I am currently completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and hold two AWS certifications.
+
+I am submitting my application today and I would love to connect with you directly to learn more about the role and the team. I am confident my experience is a strong fit for what you are looking for.
+
+Looking forward to connecting with you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494

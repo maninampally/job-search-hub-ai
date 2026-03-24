@@ -43,6 +43,11 @@ See docs/DEPLOYMENT.md for full step by step guide.
 docker compose up --build
 ```
 
+Notes:
+- Frontend Docker image is built as static assets and served in production mode.
+- `VITE_BACKEND_URL` is a build-time variable for frontend image build.
+- Backend runs with `NODE_ENV=production` in compose.
+
 App URLs:
 - Frontend: http://localhost:5173
 - Backend health: http://localhost:3001/health
@@ -60,7 +65,28 @@ docker compose down
 - Hosting: Railway (free tier)
 
 ## Environment Variables
-See .env.example for all required variables.
+Required (server):
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `REDIRECT_URI`
+- `ANTHROPIC_API_KEY`
+
+Optional:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CORS_ALLOWED_ORIGINS`
+- `EXTERNAL_API_TIMEOUT_MS`
+- `RETRY_ATTEMPTS`
+- `INITIAL_SYNC_LOOKBACK_DAYS`
+- `DAILY_SYNC_LOOKBACK_DAYS`
+- `GMAIL_SYNC_MAX_RESULTS_PER_PAGE`
+- `INITIAL_SYNC_MAX_MESSAGES`
+- `SYNC_CRON`
+
+Frontend build-time:
+- `VITE_BACKEND_URL`
+
+See `.env.example` for sample values.
 
 ## Documentation
 - docs/DEPLOYMENT.md
@@ -69,6 +95,27 @@ See .env.example for all required variables.
 ## Production Verification
 - `GET /health` should return `{"status":"ok","version":"1.0.0"}`
 - `GET /auth/status` should return auth state and `lastChecked`
+
+## MCP MVP Endpoints
+- `GET /mcp/health`
+- `GET /mcp/auth_status`
+- `GET /mcp/list_jobs`
+- `POST /mcp/sync_jobs` (optional `mode`: `daily` or `initial`)
+- `POST /mcp/create_job`
+- `PATCH /mcp/update_job`
+- `DELETE /mcp/delete_job?id=<job_id>`
+- `GET /mcp/template_list`
+- `GET /mcp/template_fetch?path=<relative_txt_path>`
+
+Notes:
+- MCP auth uses `Authorization: Bearer <MCP_AUTH_TOKEN>` when configured.
+- MCP requests are rate limited and audited.
+
+## Additional Backend Endpoints
+- `GET /jobs/analytics/weekly`
+- `GET /jobs/export/csv` (optional request body: `contacts`, `outreach`, `reminders`)
+- `GET /jobs/timeline/:id`
+- `POST /jobs/notifications/hooks/due-reminders`
 
 ## Built for
 Manikanth Nampally — Data Engineer, FAU MS 2026

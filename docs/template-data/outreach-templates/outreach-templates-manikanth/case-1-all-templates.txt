@@ -1,0 +1,134 @@
+CASE 1 — JOB OPENING EXISTS, NOT APPLIED YET
+============================================================
+
+--- Email to Recruiter [Email] ---
+Subject: Data Engineer Role at [Company] - Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I came across the Data Engineer opening at [Company] and I am genuinely excited about this opportunity. The role aligns perfectly with the work I have been doing and I wanted to reach out directly before submitting my application.
+
+I am a Data Engineer with 2+ years of experience at LTIMindtree where I built enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026. I also hold AWS Certified Cloud Practitioner and AWS Certified AI Practitioner certifications.
+
+The work [Company] is doing around [mention something specific about their tech stack or data platform] is exactly the kind of environment I am looking to grow in and contribute to.
+
+I am submitting my application today and I would love the opportunity to connect and walk you through how my experience maps to what the team is building. I have attached my resume for your reference.
+
+Looking forward to hearing from you!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+LinkedIn: [Your LinkedIn URL]
+Portfolio: [Your Portfolio URL]
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- Email to Hiring Manager [Email] ---
+Subject: Data Engineer Opening at [Company] - Manikanth Nampally
+
+Hi [Hiring Manager Name],
+
+I came across the Data Engineer opening on your team at [Company] and I am really excited about it. The work your team is doing around [mention something specific about their data platform or tech stack] is exactly the kind of challenge I have been building toward.
+
+I spent 2+ years at LTIMindtree as a Data Engineer building large scale lakehouse architectures and real time streaming pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am currently completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and I hold two AWS certifications.
+
+I am confident my hands on experience with the exact tools and architectures your team works with makes me a strong fit for this role. I am submitting my application today and wanted to reach out to you directly as well.
+
+I would love to connect briefly and share how my experience can add value to your team. I have attached my resume for your reference.
+
+Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+LinkedIn: [Your LinkedIn URL]
+Portfolio: [Your Portfolio URL]
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Recruiter [LinkedIn] ---
+
+Hi [Name], I came across the Data Engineer opening at [Company] and I am really excited about it. My background in PySpark, Spark, Databricks and AWS pipelines at 35+ TB scale is a strong match. Applying today and would love to connect!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Recruiter [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing great! I came across the Data Engineer opening at [Company] and I am genuinely thrilled about this opportunity.
+
+I am a Data Engineer with 2+ years of hands on experience building enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS at LTIMindtree. I am currently completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and hold two AWS certifications.
+
+I am submitting my application today and I would love to connect with you directly to learn more about the role and the team. I am confident my experience is a strong fit for what you are looking for.
+
+Looking forward to connecting with you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Hiring Manager [LinkedIn] ---
+
+Hi [Name], I noticed you lead the Data Engineering team at [Company]. I came across the opening and my experience building 35+ TB/day pipelines with PySpark, Databricks and AWS maps well to what your team is building. Applying today and would love to connect!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Hiring Manager [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing well! I came across the Data Engineer opening on your team at [Company] and I am really excited about it.
+
+I noticed your team is working on [mention something specific about their stack or product] and this is exactly the kind of work I have been building toward. I spent 2+ years at LTIMindtree engineering lakehouse pipelines at 35+ TB daily scale using PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026.
+
+I am applying today and I wanted to connect with you directly as well. I would love a quick conversation to share how my experience aligns with what your team is building.
+
+Looking forward to connecting!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn to Employee — Ask Referral Link [LinkedIn] ---
+
+Hey [Name],
+
+Hope you are doing great! I came across the Data Engineer opening at [Company] and I am really excited about it. It is a perfect match for my background in PySpark, Spark, Databricks, AWS and large scale pipeline engineering.
+
+I would love for you to share the internal referral link so I can apply through it. Having your referral would really strengthen my application and I am confident I would be a great addition to the team.
+
+I am a Data Engineer with 2+ years of experience building 35+ TB/day pipelines at LTIMindtree, currently completing my MS at Florida Atlantic University with a 3.9 GPA, graduating May 2026. I have also attached my resume for your reference.
+
+Looking forward to your referral link and would love to catch up soon!
+
+Manikanth
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- WhatsApp to Employee — Ask Referral Link [WhatsApp] ---
+
+Hey [Name]!
+
+Hope you are doing awesome! I came across an amazing Data Engineer opening at [Company] and I am really excited about it. It is a perfect fit for my background.
+
+Can you please share the internal referral link so I can apply through it? Your referral would make a huge difference and I am really confident about this one.
+
+Quick background on me. 2+ years at LTIMindtree building data pipelines at 35+ TB per day scale using PySpark, Spark, Databricks, Airflow, Kafka and AWS. Currently finishing my MS at Florida Atlantic University with a 3.9 GPA, graduating May 2026. Two AWS certifications as well.
+
+Please do share the referral link, looking forward to it! Would love to catch up soon too.
+
+Manikanth
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+

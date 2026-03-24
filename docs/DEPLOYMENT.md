@@ -18,6 +18,7 @@
 ## Step 3 — Environment Variables in Railway
 Add these in your Railway project > Variables tab:
 
+Required:
   GOOGLE_CLIENT_ID     = from Google Cloud
   GOOGLE_CLIENT_SECRET = from Google Cloud
   REDIRECT_URI         = https://YOUR-APP.railway.app/auth/callback
@@ -27,13 +28,18 @@ Add these in your Railway project > Variables tab:
   CORS_ALLOWED_ORIGINS = your frontend URL
   EXTERNAL_API_TIMEOUT_MS = 12000
   RETRY_ATTEMPTS       = 2
+  NODE_ENV             = production
 
 Optional (recommended for persistent production storage):
   SUPABASE_URL               = from Supabase project settings
   SUPABASE_SERVICE_ROLE_KEY  = from Supabase project settings
 
 ## Step 4 — Update Frontend
-Set your frontend backend URL to the Railway API domain (for example with VITE_BACKEND_URL).
+Set your frontend backend URL to the Railway API domain with `VITE_BACKEND_URL`.
+
+Important:
+- `VITE_BACKEND_URL` is build-time for Vite. Set it before frontend image/build runs.
+- If using Docker compose build args, pass `VITE_BACKEND_URL` into the frontend build stage.
 
 ## Step 5 — Connect Gmail
 1. Open the Job Search Hub app

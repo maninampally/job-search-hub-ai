@@ -4,6 +4,7 @@ const {
   addJob,
   deleteJob,
   getJobEmails,
+  getJobStatusTimeline,
   getJobs,
   getLastChecked,
   getTokens,
@@ -11,8 +12,66 @@ const {
   updateJob,
 } = require("../store/dataStore");
 const { backfillJobEmailsFromExistingJobs, fetchJobEmails } = require("../services/jobSync");
+const { env } = require("../config/env");
 
 const jobRoutes = express.Router();
+const VALID_STATUSES = new Set(["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"]);
+
+function isValidDateInput(value) {
+  if (value === null || value === undefined || value === "") {
+    return true;
+  }
+  return !Number.isNaN(new Date(value).getTime());
+}
+
+function isStringWithinLimit(value, maxLength) {
+  if (value === undefined || value === null) {
+    return true;
+  }
+  return typeof value === "string" && value.length <= maxLength;
+}
+
+function toDateSafe(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function csvEscape(value) {
+  const text = String(value === undefined || value === null ? "" : value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+async function sendWebhook(url, payload) {
+  if (!url) {
+    return { delivered: false, reason: "not_configured" };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    return {
+      delivered: response.ok,
+      status: response.status,
+    };
+  } catch (error) {
+    return {
+      delivered: false,
+      reason: error.message,
+    };
+  }
+}
 
 jobRoutes.get("/", async (req, res) => {
   try {
@@ -66,6 +125,14 @@ jobRoutes.post("/", async (req, res) => {
     return res.status(400).json({ error: "company and role are required" });
   }
 
+  if (status && !VALID_STATUSES.has(status)) {
+    return res.status(400).json({ error: "Invalid status value" });
+  }
+
+  if (!isValidDateInput(appliedDate)) {
+    return res.status(400).json({ error: "Invalid appliedDate" });
+  }
+
   try {
     const newJob = {
       id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -90,9 +157,203 @@ jobRoutes.post("/", async (req, res) => {
   }
 });
 
-jobRoutes.patch("/:id", async (req, res) => {
+jobRoutes.get("/analytics/weekly", async (req, res) => {
   try {
-    await updateJob(req.params.id, req.body || {});
+    const jobs = await getJobs();
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const applicationsThisWeek = jobs.filter((job) => {
+      const anchor = toDateSafe(job.createdAt || job.appliedDate);
+      return Boolean(anchor && anchor >= weekAgo && anchor <= now);
+    }).length;
+
+    const responsesThisWeek = jobs.reduce((count, job) => {
+      const emails = Array.isArray(job.emails) ? job.emails : [];
+      const hasResponse = emails.some((email) => {
+        const date = toDateSafe(email.date);
+        return (
+          date &&
+          date >= weekAgo &&
+          date <= now &&
+          ["Recruiter Outreach", "Interview Scheduled", "Offer", "Rejection"].includes(email.type)
+        );
+      });
+
+      return count + (hasResponse ? 1 : 0);
+    }, 0);
+
+    const interviewsThisWeek = jobs.reduce((count, job) => {
+      const emails = Array.isArray(job.emails) ? job.emails : [];
+      const hasInterview = emails.some((email) => {
+        const date = toDateSafe(email.date);
+        return date && date >= weekAgo && date <= now && email.type === "Interview Scheduled";
+      });
+
+      return count + (hasInterview ? 1 : 0);
+    }, 0);
+
+    const stalledJobs = jobs.filter((job) => {
+      if (!["Applied", "Screening"].includes(job.status || "")) {
+        return false;
+      }
+      const anchor = toDateSafe(job.appliedDate || job.createdAt);
+      if (!anchor) {
+        return false;
+      }
+      const ageInDays = Math.floor((now.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
+      return ageInDays >= 14;
+    }).length;
+
+    return res.json({
+      applicationsThisWeek,
+      responsesThisWeek,
+      interviewsThisWeek,
+      stalledJobs,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to build weekly analytics", details: error.message });
+  }
+});
+
+jobRoutes.get("/export/csv", async (req, res) => {
+  try {
+    const jobs = await getJobs();
+    const reminders = Array.isArray(req.body?.reminders) ? req.body.reminders : [];
+    const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+    const outreach = Array.isArray(req.body?.outreach) ? req.body.outreach : [];
+
+    const lines = [];
+    lines.push("section,field1,field2,field3,field4,field5,field6");
+
+    for (const job of jobs) {
+      lines.push(
+        [
+          "jobs",
+          csvEscape(job.id),
+          csvEscape(job.company),
+          csvEscape(job.role),
+          csvEscape(job.status),
+          csvEscape(job.appliedDate),
+          csvEscape(job.recruiterName),
+        ].join(",")
+      );
+    }
+
+    for (const contact of contacts) {
+      lines.push(
+        [
+          "contacts",
+          csvEscape(contact.id),
+          csvEscape(contact.name),
+          csvEscape(contact.company),
+          csvEscape(contact.relationship),
+          csvEscape(contact.email),
+          csvEscape(contact.notes),
+        ].join(",")
+      );
+    }
+
+    for (const entry of outreach) {
+      lines.push(
+        [
+          "outreach",
+          csvEscape(entry.id),
+          csvEscape(entry.contact),
+          csvEscape(entry.company),
+          csvEscape(entry.method),
+          csvEscape(entry.status),
+          csvEscape(entry.notes),
+        ].join(",")
+      );
+    }
+
+    for (const reminder of reminders) {
+      lines.push(
+        [
+          "reminders",
+          csvEscape(reminder.id),
+          csvEscape(reminder.title),
+          csvEscape(reminder.type),
+          csvEscape(reminder.dueDate),
+          csvEscape(reminder.completed),
+          csvEscape(""),
+        ].join(",")
+      );
+    }
+
+    const fileName = `job-search-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=\"${fileName}\"`);
+    return res.status(200).send(lines.join("\n"));
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to export CSV", details: error.message });
+  }
+});
+
+jobRoutes.get("/timeline/:id", async (req, res) => {
+  try {
+    const jobs = await getJobs();
+    const job = jobs.find((item) => item.id === req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const timeline = await getJobStatusTimeline(req.params.id);
+    return res.json({ timeline });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to load timeline", details: error.message });
+  }
+});
+
+jobRoutes.post("/notifications/hooks/due-reminders", async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const reminders = Array.isArray(req.body?.reminders) ? req.body.reminders : [];
+    const dueReminders = reminders.filter(
+      (item) => !item.completed && String(item.dueDate || "") <= today
+    );
+
+    const payload = {
+      event: "due_reminders",
+      generatedAt: new Date().toISOString(),
+      count: dueReminders.length,
+      reminders: dueReminders,
+    };
+
+    const [emailResult, slackResult, whatsappResult] = await Promise.all([
+      sendWebhook(env.NOTIFY_EMAIL_WEBHOOK_URL, payload),
+      sendWebhook(env.NOTIFY_SLACK_WEBHOOK_URL, payload),
+      sendWebhook(env.NOTIFY_WHATSAPP_WEBHOOK_URL, payload),
+    ]);
+
+    return res.json({
+      success: true,
+      count: dueReminders.length,
+      delivery: {
+        email: emailResult,
+        slack: slackResult,
+        whatsapp: whatsappResult,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to send notification hooks", details: error.message });
+  }
+});
+
+jobRoutes.patch("/:id", async (req, res) => {
+  const patch = req.body || {};
+  if (patch.status !== undefined && !VALID_STATUSES.has(patch.status)) {
+    return res.status(400).json({ error: "Invalid status value" });
+  }
+
+  if (patch.appliedDate !== undefined && !isValidDateInput(patch.appliedDate)) {
+    return res.status(400).json({ error: "Invalid appliedDate" });
+  }
+
+  try {
+    await updateJob(req.params.id, patch);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to update job", details: error.message });
@@ -134,6 +395,36 @@ jobRoutes.post("/:id/emails", async (req, res) => {
   const body = req.body || {};
   if (!body.subject || !body.date) {
     return res.status(400).json({ error: "subject and date are required" });
+  }
+
+  if (!isValidDateInput(body.date)) {
+    return res.status(400).json({ error: "Invalid email date" });
+  }
+
+  if (!isStringWithinLimit(body.subject, 500)) {
+    return res.status(400).json({ error: "subject exceeds max length (500)" });
+  }
+
+  if (!isStringWithinLimit(body.preview, 4000)) {
+    return res.status(400).json({ error: "preview exceeds max length (4000)" });
+  }
+
+  if (!isStringWithinLimit(body.body, 50000)) {
+    return res.status(400).json({ error: "body exceeds max length (50000)" });
+  }
+
+  if (body.type !== undefined) {
+    const allowedTypes = new Set([
+      "Application Confirmation",
+      "Recruiter Outreach",
+      "Interview Scheduled",
+      "Rejection",
+      "Offer",
+      "Auto / Tracking",
+    ]);
+    if (!allowedTypes.has(body.type)) {
+      return res.status(400).json({ error: "Invalid email type" });
+    }
   }
 
   try {
