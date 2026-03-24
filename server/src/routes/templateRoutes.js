@@ -56,9 +56,13 @@ templateRoutes.get("/archive/content", async (req, res) => {
   }
 
   const resolvedPath = path.resolve(archiveBasePath, relativePath);
-  const normalizedBase = `${archiveBasePath}${path.sep}`;
+  const relativeResolvedPath = path.relative(archiveBasePath, resolvedPath);
+  const isPathTraversal =
+    !relativeResolvedPath ||
+    relativeResolvedPath.startsWith("..") ||
+    path.isAbsolute(relativeResolvedPath);
 
-  if (!resolvedPath.startsWith(normalizedBase) || !resolvedPath.toLowerCase().endsWith(".txt")) {
+  if (isPathTraversal || !resolvedPath.toLowerCase().endsWith(".txt")) {
     return res.status(400).json({ error: "Invalid template path" });
   }
 

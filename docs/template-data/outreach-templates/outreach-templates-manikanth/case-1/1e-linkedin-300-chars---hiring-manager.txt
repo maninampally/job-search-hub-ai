@@ -1,0 +1,1 @@
+Hi [Name], I noticed you lead the Data Engineering team at [Company]. I came across the opening and my experience building 35+ TB/day pipelines with PySpark, Databricks and AWS maps well to what your team is building. Applying today and would love to connect!

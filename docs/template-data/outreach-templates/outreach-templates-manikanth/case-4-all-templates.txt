@@ -1,0 +1,99 @@
+CASE 4 — AFTER NO RESPONSE, FOLLOW UP
+============================================================
+
+--- Email Follow Up — No Response Recruiter [Email] ---
+Subject: Following Up — Data Engineer — Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I hope you are doing well! I wanted to follow up on my message from [date] regarding the Data Engineer role at [Company].
+
+I remain really excited about this opportunity and I am confident my experience in PySpark, Databricks and AWS scale pipeline engineering is a strong fit for what your team needs.
+
+I would love the chance to connect briefly. I have reattached my resume for your reference.
+
+Looking forward to hearing from you!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- Email Follow Up — No Response Hiring Manager [Email] ---
+Subject: Following Up — Data Engineer — Manikanth Nampally
+
+Hi [Hiring Manager Name],
+
+I hope you are doing well! I wanted to follow up on my message from [date] regarding the Data Engineer role on your team at [Company].
+
+I remain genuinely excited about this opportunity. The work your team is doing around [mention something specific] is exactly what I have been building toward and I am confident I can add strong value.
+
+I would love a brief conversation at your convenience. I have reattached my resume for your reference.
+
+Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Follow Up — No Response Recruiter [LinkedIn] ---
+
+Hi [Name],
+
+I wanted to follow up on my message from last week regarding the Data Engineer opening at [Company]. I remain really excited about this opportunity and confident that my background in PySpark, Databricks and AWS scale pipelines is a strong match.
+
+Would love to connect and learn more about the role. Looking forward to hearing from you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Follow Up — No Response Hiring Manager [LinkedIn] ---
+
+Hi [Name],
+
+I wanted to follow up on my message from last week about the Data Engineer role on your team at [Company]. I remain genuinely excited about this opportunity and the work your team is building.
+
+I would love a brief conversation to share how my experience in PySpark, Databricks, Kafka and AWS pipelines at 35+ TB scale can contribute to your team. Looking forward to connecting!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com | +1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Follow Up — No Response Employee [LinkedIn] ---
+
+Hey [Name],
+
+I wanted to follow up on my earlier message about the Data Engineer role at [Company]. I am still really excited about this opportunity and would truly appreciate your support with a referral or a good word internally.
+
+I am confident I would be a great fit and your help would mean a lot to me.
+
+Looking forward to your support!
+
+Manikanth
+manikanthnampally94@gmail.com | +1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- WhatsApp Follow Up — No Response Employee [WhatsApp] ---
+
+Hey [Name]!
+
+I wanted to follow up on my earlier message about the Data Engineer role at [Company]. I am still really excited about this one and would truly appreciate your support with a referral or a good word internally.
+
+I am really confident I would be a great fit and your help would honestly make a huge difference!
+
+Looking forward to your support!
+
+Manikanth
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+

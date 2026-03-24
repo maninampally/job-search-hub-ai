@@ -1,0 +1,121 @@
+CASE 3 — NO JOB OPENING, COLD OUTREACH
+============================================================
+
+--- Cold Email — Recruiter [Email] ---
+Subject: Connecting — Data Engineer — Manikanth Nampally
+
+Hi [Recruiter Name],
+
+I hope you are doing well! I have been following [Company] and I am really impressed by the data engineering work your team is doing, especially around [mention something specific about their tech stack, product, or a recent blog post].
+
+I wanted to reach out and introduce myself. I am a Data Engineer with 2+ years of experience at LTIMindtree building enterprise scale ETL and ELT pipelines processing 35+ TB of data daily using Python, PySpark, Spark, Databricks, Airflow, Kafka, and AWS. I am completing my Master's in IT Management at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and hold two AWS certifications.
+
+I would love to stay connected and be considered for any Data Engineer openings that come up on your team.
+
+I have attached my resume for your reference. Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- Cold Email — Hiring Manager [Email] ---
+Subject: Connecting — Data Engineer — Manikanth Nampally
+
+Hi [Hiring Manager Name],
+
+I hope you are doing well! I have been following [Company]'s data engineering work closely and I am genuinely impressed by what your team is building around [mention something specific].
+
+I wanted to introduce myself. I am a Data Engineer with 2+ years of experience building enterprise scale lakehouse pipelines processing 35+ TB daily using PySpark, Spark, Databricks, Airflow, Kafka, and AWS at LTIMindtree. I am completing my Master's at Florida Atlantic University with a 3.9 GPA, graduating May 2026.
+
+Even though I do not see a current opening, I would love to stay on your radar for any Data Engineer roles that come up on your team. I am confident my background would be a strong fit for the work you are doing.
+
+I have attached my resume for your reference. Looking forward to connecting!
+
+Best regards,
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Cold Recruiter [LinkedIn] ---
+
+Hi [Name], I have been following [Company]'s data engineering work and I am really impressed. I am a Data Engineer with 2+ years in PySpark, Databricks and AWS at 35+ TB scale. Would love to stay connected for any future openings!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Cold Recruiter [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing great! I have been following [Company] and I am genuinely impressed by the data platform work your team is doing around [mention something specific].
+
+I am a Data Engineer with 2+ years of experience at LTIMindtree building enterprise scale lakehouse pipelines processing 35+ TB daily using PySpark, Spark, Databricks, Airflow, Kafka and AWS. I am completing my Master's at Florida Atlantic University with a 3.9 GPA, graduating May 2026, and hold two AWS certifications.
+
+I would love to connect and stay on your radar for any Data Engineer openings that come up on your team.
+
+Looking forward to connecting!
+Manikanth Nampally
+manikanthnampally94@gmail.com
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn 300 chars — Cold Hiring Manager [LinkedIn] ---
+
+Hi [Name], I have been following the data engineering work at [Company] and I am really impressed by what your team is building. I am a Data Engineer with 2+ years in PySpark, Databricks and AWS at scale and would love to connect for any future openings!
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn Full Message — Cold Hiring Manager [LinkedIn] ---
+
+Hi [Name],
+
+I hope you are doing well! I have been following [Company]'s data engineering work and I am genuinely impressed by what your team is building around [mention something specific].
+
+I am a Data Engineer with 2+ years of experience building 35+ TB/day lakehouse pipelines at LTIMindtree using PySpark, Spark, Databricks, Airflow, Kafka and AWS. I am completing my MS at Florida Atlantic University with a 3.9 GPA, graduating May 2026.
+
+Even though there may not be a current opening, I would love to stay connected and be considered when a Data Engineer role comes up on your team.
+
+Looking forward to connecting!
+Manikanth Nampally
+manikanthnampally94@gmail.com | +1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- LinkedIn to Employee — Future Referral [LinkedIn] ---
+
+Hey [Name],
+
+Hope you are doing great! I have been following [Company]'s data engineering work and I am really impressed by what the team is building.
+
+I wanted to reach out because I would love to join [Company] as a Data Engineer when an opening comes up. Would you be open to referring me or letting me know when a role opens on your team?
+
+A quick background on me. I am a Data Engineer with 2+ years of experience building 35+ TB/day pipelines at LTIMindtree using PySpark, Spark, Databricks, Airflow, Kafka and AWS. Currently completing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+I would be really grateful for your support! Would love to catch up too.
+
+Manikanth
+manikanthnampally94@gmail.com | +1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+--- WhatsApp to Employee — Future Referral [WhatsApp] ---
+
+Hey [Name]!
+
+Hope you are doing awesome! I have been following [Company]'s work and I am really impressed by what the team is building.
+
+I wanted to reach out because I would love to join [Company] as a Data Engineer when an opening comes up. Would you be open to referring me or giving me a heads up when a role opens on your team?
+
+Quick snapshot: 2+ years at LTIMindtree building data pipelines at 35+ TB/day using PySpark, Spark, Databricks, Airflow, Kafka and AWS. Finishing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+Would be really grateful for your support! Let us catch up soon too.
+
+Manikanth
++1 (561) 542-6494
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+

@@ -1,0 +1,1 @@
+Hi [Name], I have been following the data engineering work at [Company] and I am really impressed by what your team is building. I am a Data Engineer with 2+ years in PySpark, Databricks and AWS at scale and would love to connect for any future openings!
