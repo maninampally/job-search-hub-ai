@@ -354,6 +354,42 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.job-kanban-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.job-kanban-column {
+  border: 1px solid #e1e6f0;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.65rem;
+  min-height: 120px;
+}
+
+.job-kanban-column.is-drop-target {
+  outline: 2px dashed #3e86e8;
+  outline-offset: 2px;
+}
+
+.job-kanban-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+
+.job-kanban-column-header h4 {
+  margin: 0;
+}
+
+.job-kanban-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .question-list,
 .outreach-list,
 .reminder-list {
@@ -436,6 +472,14 @@ button:disabled {
   border-radius: 10px;
   padding: 0.75rem;
   background: #fafcff;
+}
+
+.tracker-card.is-draggable {
+  cursor: grab;
+}
+
+.tracker-card.is-dragging {
+  opacity: 0.65;
 }
 
 .tracker-card.card-status-wishlist {
@@ -937,6 +981,10 @@ button:disabled {
 
   .two-col,
   .pipeline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-kanban-grid {
     grid-template-columns: 1fr;
   }
 
