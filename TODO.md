@@ -1,82 +1,67 @@
-# TODO — Job Search Hub Execution Guide
+# TODO — Repository Stabilization Plan (Audit Based)
 
-## Project Definition (What this is)
-- Build a personal AI-powered job search operating system for one user.
-- Centralize applications, outreach, contacts, interview prep, reminders, ATS checks, and Gmail auto-detection.
-- Reduce manual tracking and create a consistent daily workflow.
+## P0 — Critical (Do now)
+- [x] Fix sync idempotency in `server/src/services/jobSync.js`
+  - [x] Do not mark Gmail message as processed when `processEmail()` fails
+  - [x] Refresh OAuth token before sync starts if expired
+  - [x] Remove two-step create+update path for non-applied jobs to avoid partial writes
+- [x] Add strict payload validation in `server/src/routes/jobRoutes.js`
+  - [x] Validate `status` against allowed pipeline statuses
+  - [x] Validate `date` fields (`appliedDate`, email `date`) before saving
+  - [x] Add size checks for `subject`, `preview`, `body`
+- [x] Add fail-fast env checks in `server/src/config/env.js`
+  - [x] Error at startup if required keys are missing (`GOOGLE_*`, `REDIRECT_URI`, `ANTHROPIC_API_KEY`) in production
+- [x] Harden template archive path validation in `server/src/routes/templateRoutes.js`
+  - [x] Use `path.relative` guard and reject traversal paths cross-platform
 
-## Product Target (How it should be)
-- Deliver one clean app with these modules:
-  - Dashboard
-  - Job Tracker
-  - Contacts
-  - Templates
-  - Interview Prep
-  - Outreach
-  - Reminders
-  - ATS Checker
-- Support Gmail OAuth connection and background sync every 5 minutes.
-- Extract job data from Gmail with Claude into structured fields (company, role, status, recruiter, notes, next step).
-- Use pipeline statuses: Wishlist → Applied → Screening → Interview → Offer → Rejected.
-- Keep frontend useful even without backend (demo/empty states), then switch to live data when connected.
-- Persist data in database (Supabase/Postgres), not in-memory.
+## P1 — High
+- [x] Deployment hardening
+  - [x] Use production frontend container strategy (build static assets, serve static)
+  - [x] Set `NODE_ENV=production` in compose for backend
+  - [x] Add service healthcheck and health-aware `depends_on`
+- [x] Frontend architecture cleanup
+  - [x] Split monolithic `client/src/pages/Dashboard.jsx` into feature modules (route/data extraction)
+  - [x] Remove dead route helper logic no longer used after router migration
 
-## Priority Gap to Close
-- Move backend from in-memory store to persistent DB and connect full frontend modules to real APIs.
+## P2 — Medium
+- [x] Docs/env consistency sweep
+  - [x] Align `README.md`, `docs/DEPLOYMENT.md`, `.env.example`
+  - [x] Clearly mark required vs optional env vars
+- [x] Package cleanup
+  - [x] Remove `job-search-hub: file:` self-reference from root `package.json`
+  - [x] Remove `job-search-hub: file:..` from `client/package.json`
 
-## Execution Order (Follow this sequence)
+## Verification Checklist
+- [x] Sync run with expired token still completes (code path implemented; requires connected Gmail for live verification)
+- [x] Failed message processing is retried next run (not incorrectly marked processed) (code path implemented; requires connected Gmail for live verification)
+- [x] PATCH `/jobs/:id` rejects invalid statuses
+- [x] POST `/jobs/:id/emails` rejects invalid or oversized payloads
+- [x] Template archive endpoint blocks traversal attempts
+- [x] Frontend routes refresh correctly (`/dashboard`, `/jobtracker/settings`, `/templates/library`)
 
-### Phase 1 — Foundation (Must do first)
-- [x] Keep repo structure clean (`client/`, `server/`, `docs/`, root configs).
-- [x] Finalize frontend base layout to match desired dashboard UX.
-- [x] Confirm backend app starts reliably from repo environment.
-- [x] Ensure `.env` loading works and environment variables are documented.
+## Better Options Roadmap
+- [x] Add smart follow-up suggestions on Dashboard (stale Applied/Screening jobs without follow-up reminders)
+- [x] Auto-create follow-up reminder when a new manual job is created
+- [x] Add weekly summary report (applications, responses, interviews, stalled jobs)
+- [x] Add recruiter auto-contact creation from parsed Gmail emails
+- [x] Add Kanban board drag/drop in Job Tracker
+- [x] Add calendar integration for reminders/interviews
 
-### Phase 2 — Persistent Backend (Critical)
-- [x] Create Supabase/Postgres schema for:
-  - [x] jobs
-  - [x] oauth_tokens
-  - [x] processed_emails
-- [x] Replace in-memory `store` usage with DB queries.
-- [x] Persist OAuth tokens and refresh token lifecycle.
-- [x] Persist processed Gmail IDs to prevent duplicates across restarts.
-- [x] Keep `/health`, `/auth/*`, `/jobs`, `/jobs/:id`, `/jobs/:id/imported` working.
+## AI + MCP Options
+- [x] Add MCP server MVP tools: `health`, `auth_status`, `list_jobs`, `sync_jobs`
+- [x] Add MCP write tools: `create_job`, `update_job`, `delete_job`
+- [x] Add MCP template tools: `template_list`, `template_fetch`
+- [x] Add MCP auth and audit middleware (`MCP_AUTH_TOKEN`, request logging)
+- [x] Add MCP rate limiting and tool-level permission guardrails
 
-### Phase 3 — Reliability + Security
-- [x] Add retry/backoff for Gmail and Claude API calls.
-- [x] Add request timeout handling to external API calls.
-- [x] Restrict CORS to allowed frontend origin(s).
-- [x] Improve error messages returned to frontend.
-- [x] Add basic logging around sync runs and failures.
+## Data + Backend Enhancements
+- [x] Add job status timeline history table/structure (status change + timestamp)
+- [x] Add weekly analytics endpoint (new apps, responses, interviews, stalls)
+- [x] Add CSV export endpoint for jobs/contacts/outreach/reminders
+- [x] Add queue-based email processing for high-volume sync
 
-### Phase 4 — Frontend Real Data Wiring
-- [x] Replace demo-only flows with backend-driven data where available.
-- [x] Keep graceful fallback UI when backend is unavailable.
-- [x] Wire module-level CRUD actions to API endpoints.
-- [x] Add clear loading/error/success states in each module.
-
-### Phase 5 — Feature Completion
-- [x] Job Tracker full CRUD + status management.
-- [x] Contacts management + search/filter.
-- [x] Templates browser + copy workflow.
-- [x] Interview Prep with answer save/edit.
-- [x] Outreach tracker with status updates.
-- [x] Reminders with overdue highlighting.
-- [x] ATS Checker input + score + suggestions display.
-
-### Phase 6 — Deployment Readiness
-- [x] Verify Railway deployment config and start command.
-- [x] Verify OAuth redirect URIs are correct.
-- [x] Set production env vars correctly.
-- [x] Confirm hosted `/health` and auth status endpoints.
-
-## Definition of Done (MVP)
-- [x] App works end-to-end with persistent storage.
-- [ ] Gmail connect + sync imports jobs reliably.
-- [x] Data survives backend restart.
-- [x] Dashboard and modules show live data (with fallback when needed).
-- [x] Deployment steps are accurate and repeatable.
-
-## Notes
-- Keep changes incremental and test after each phase.
-- Prioritize reliability and persistence before adding new advanced features.
+## UX + Productivity Enhancements
+- [x] Add global search across jobs, contacts, reminders, templates
+- [x] Add saved filters/smart views (`Needs Follow-up`, `Interview This Week`)
+- [x] Add dashboard weekly summary card
+- [x] Add notification hooks (email/Slack/WhatsApp) for due reminders

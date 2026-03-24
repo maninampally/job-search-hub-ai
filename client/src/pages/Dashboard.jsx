@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   BACKEND_URL,
   createJob,
@@ -7,10 +8,15 @@ import {
   getAuthStatus,
   getHealth,
   getJobs,
+  getWeeklyAnalytics,
   markJobImported,
+  sendDueReminderHooks,
   syncJobs,
   updateJob,
 } from "../api/backend";
+import { INTERVIEW_QUESTIONS } from "./dashboard/interviewData";
+import { getPathForView, NAV_ITEMS } from "./dashboard/routeConfig";
+import { TEMPLATES } from "./dashboard/templatesData";
 
 const DEMO_JOBS = [
   {
@@ -78,17 +84,6 @@ const EMAIL_TYPE_CLASS = {
 
 const EMAIL_READ_STORAGE_KEY = "jsa_v2";
 
-const NAV_ITEMS = [
-  "Dashboard",
-  "Job Tracker",
-  "Contacts",
-  "Templates",
-  "Interview Prep",
-  "Outreach",
-  "Reminders",
-  "ATS Checker",
-];
-
 const CARD_ITEMS = [
   { label: "Total Applied", key: "total", tone: "tone-blue" },
   { label: "In Progress", key: "active", tone: "tone-purple" },
@@ -98,141 +93,15 @@ const CARD_ITEMS = [
 
 const CONTACT_RELATIONSHIPS = ["Recruiter", "Hiring Manager", "Employee", "Alumni", "Friend", "Other"];
 
-const TEMPLATES = [
-  {
-    id: "t1",
-    case: "1",
-    name: "Email to Recruiter",
-    sub: "Job exists, not applied",
-    type: "Email",
-    subject: "Data Engineer Role at [Company] — Manikanth Nampally",
-    body: "Hi [Recruiter Name],\n\nI came across the Data Engineer opening at [Company] and I’m excited about the opportunity. I have 2+ years building large-scale pipelines with Python, PySpark, Databricks, Airflow, Kafka, and AWS.\n\nI’m submitting my application and would love to connect.\n\nBest,\nManikanth Nampally",
-  },
-  {
-    id: "t2",
-    case: "1",
-    name: "Email to Hiring Manager",
-    sub: "Job exists, not applied",
-    type: "Email",
-    subject: "Data Engineer Opening at [Company] — Manikanth Nampally",
-    body: "Hi [Hiring Manager Name],\n\nI’m reaching out regarding the Data Engineer role on your team. My background in data lakehouse and streaming systems aligns well with this role.\n\nI’m applying today and would value a brief conversation.\n\nBest,\nManikanth Nampally",
-  },
-  {
-    id: "t3",
-    case: "1",
-    name: "LinkedIn 300 chars to Recruiter",
-    sub: "Job exists, not applied",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name], I saw the Data Engineer role at [Company] and I’m very interested. I have 2+ years building large-scale pipelines with PySpark, Databricks, and AWS. I’m applying today and would love to connect.",
-  },
-  {
-    id: "t4",
-    case: "1",
-    name: "LinkedIn Full to Recruiter",
-    sub: "Job exists, not applied",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name],\n\nI came across the Data Engineer opening at [Company] and I’m excited to apply. I bring 2+ years of experience building 35+ TB/day pipelines with PySpark, Databricks, Airflow, Kafka, and AWS.\n\nWould love to connect and learn about next steps.\n\nManikanth",
-  },
-  {
-    id: "t5",
-    case: "1",
-    name: "LinkedIn 300 chars to Hiring Manager",
-    sub: "Job exists, not applied",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name], I noticed the Data Engineer opening on your team at [Company]. My experience with PySpark, Databricks, Kafka, and AWS at scale maps closely to this role. I’m applying today and would appreciate connecting.",
-  },
-  {
-    id: "t6",
-    case: "1",
-    name: "LinkedIn Full to Hiring Manager",
-    sub: "Job exists, not applied",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name],\n\nI’m interested in the Data Engineer role on your team at [Company]. I have hands-on experience with large-scale ETL/ELT and streaming systems using PySpark, Databricks, Airflow, Kafka, and AWS.\n\nI’m applying and would value a quick conversation.\n\nManikanth",
-  },
-  {
-    id: "t7",
-    case: "1",
-    name: "LinkedIn to Employee Referral",
-    sub: "Job exists, not applied",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hey [Name], I found a Data Engineer opening at [Company] that matches my background well. Would you be open to sharing a referral link or referring me? I’d really appreciate your support.",
-  },
-  {
-    id: "t8",
-    case: "1",
-    name: "WhatsApp to Employee Referral",
-    sub: "Job exists, not applied",
-    type: "WhatsApp",
-    subject: "",
-    body: "Hey [Name]! Hope you’re well. I found a Data Engineer opening at [Company]. Could you please share the referral link or refer me? It would really help. Thanks a lot!",
-  },
-  {
-    id: "t9",
-    case: "2",
-    name: "Email Follow Up to Recruiter",
-    sub: "Job exists, already applied",
-    type: "Email",
-    subject: "Following Up — Data Engineer Application",
-    body: "Hi [Recruiter Name],\n\nI wanted to follow up on my Data Engineer application submitted on [date]. I remain excited and would appreciate any update on next steps.\n\nBest,\nManikanth Nampally",
-  },
-  {
-    id: "t10",
-    case: "3",
-    name: "Cold Email to Recruiter",
-    sub: "No opening, cold outreach",
-    type: "Email",
-    subject: "Connecting — Data Engineer — Manikanth Nampally",
-    body: "Hi [Recruiter Name],\n\nI’ve been following [Company] and am impressed by your data platform work. I’d love to be considered for future Data Engineer opportunities and stay connected.\n\nBest,\nManikanth Nampally",
-  },
-  {
-    id: "t11",
-    case: "3",
-    name: "Cold LinkedIn to Recruiter",
-    sub: "No opening, cold outreach",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name], I’ve been following [Company]’s data engineering work and would love to connect. I’m a Data Engineer with experience in PySpark, Databricks, Kafka, and AWS, and would appreciate being considered for future roles.",
-  },
-  {
-    id: "t12",
-    case: "4",
-    name: "LinkedIn Follow Up No Response",
-    sub: "No response follow up",
-    type: "LinkedIn",
-    subject: "",
-    body: "Hi [Name], following up on my previous note regarding Data Engineer opportunities at [Company]. I remain very interested and would appreciate connecting when convenient.",
-  },
-  {
-    id: "t13",
-    case: "4",
-    name: "Email Follow Up No Response",
-    sub: "No response follow up",
-    type: "Email",
-    subject: "Following Up — Data Engineer",
-    body: "Hi [Name],\n\nI’m following up on my earlier message regarding Data Engineer opportunities at [Company]. I remain very interested and would appreciate a quick update when possible.\n\nBest,\nManikanth Nampally",
-  },
-];
-
 const CONTACTS_STORAGE_KEY = "jsh_contacts_v1";
 const INTERVIEW_STORAGE_KEY = "jsh_interview_answers_v1";
 const OUTREACH_STORAGE_KEY = "jsh_outreach_v1";
 const REMINDERS_STORAGE_KEY = "jsh_reminders_v1";
 
-const INTERVIEW_QUESTIONS = [
-  { id: "q1", category: "Technical", difficulty: "Medium", text: "Explain SCD Type 2 in a warehouse." },
-  { id: "q2", category: "Technical", difficulty: "Hard", text: "How do you fix data skew in Spark?" },
-  { id: "q3", category: "System Design", difficulty: "Hard", text: "Design a real-time data pipeline." },
-  { id: "q4", category: "Behavioral", difficulty: "Medium", text: "Describe a production issue you solved." },
-  { id: "q5", category: "Behavioral", difficulty: "Easy", text: "Tell me about cross-team collaboration." },
-];
-
-export function DashboardPage() {
-  const [activeView, setActiveView] = useState("Dashboard");
+export function DashboardPage({ routeView = "Dashboard" }) {
+  const [activeView, setActiveView] = useState(routeView);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isHealthy, setIsHealthy] = useState(false);
   const [healthText, setHealthText] = useState("Checking backend...");
   const [connected, setConnected] = useState(false);
@@ -243,7 +112,9 @@ export function DashboardPage() {
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [jobSmartView, setJobSmartView] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [contacts, setContacts] = useState([]);
   const [contactSearch, setContactSearch] = useState("");
   const [contactRelationship, setContactRelationship] = useState("All");
@@ -259,6 +130,10 @@ export function DashboardPage() {
   const [templateSearch, setTemplateSearch] = useState("");
   const [expandedTemplate, setExpandedTemplate] = useState(null);
   const [copiedTemplateId, setCopiedTemplateId] = useState(null);
+  const [archiveFiles, setArchiveFiles] = useState([]);
+  const [archiveSelectedPath, setArchiveSelectedPath] = useState("");
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveContent, setArchiveContent] = useState("");
   const [jobForm, setJobForm] = useState({
     company: "",
     role: "",
@@ -267,6 +142,8 @@ export function DashboardPage() {
     notes: "",
   });
   const [editingJobId, setEditingJobId] = useState(null);
+  const [draggedJobId, setDraggedJobId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState("");
   const [expandedJobs, setExpandedJobs] = useState({});
   const [activeEmailModal, setActiveEmailModal] = useState(null);
   const [emailReadMap, setEmailReadMap] = useState({});
@@ -284,6 +161,7 @@ export function DashboardPage() {
   });
 
   const [reminders, setReminders] = useState([]);
+  const [sendingReminderHooks, setSendingReminderHooks] = useState(false);
   const [reminderForm, setReminderForm] = useState({
     title: "",
     dueDate: "",
@@ -293,11 +171,18 @@ export function DashboardPage() {
   const [atsResume, setAtsResume] = useState("");
   const [atsJobDescription, setAtsJobDescription] = useState("");
   const [atsResult, setAtsResult] = useState(null);
+  const [weeklySummaryApi, setWeeklySummaryApi] = useState(null);
 
   const connectedFromCallback = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     return params.get("connected") === "true";
-  }, []);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (routeView !== activeView) {
+      setActiveView(routeView);
+    }
+  }, [routeView]);
 
   const isDemoMode = jobs.length === 0;
   const displayJobs = isDemoMode ? DEMO_JOBS : jobs;
@@ -318,6 +203,67 @@ export function DashboardPage() {
   const upcomingFollowUps = displayJobs
     .filter((job) => ["Applied", "Screening", "Interview"].includes(job.status || ""))
     .slice(0, 3);
+
+  const weeklySummary = (() => {
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    function toDateSafe(value) {
+      if (!value) {
+        return null;
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function isInLastSevenDays(value) {
+      const parsed = toDateSafe(value);
+      return Boolean(parsed && parsed >= weekAgo && parsed <= now);
+    }
+
+    const applicationsThisWeek = displayJobs.filter((job) => {
+      return isInLastSevenDays(job.createdAt || job.appliedDate);
+    }).length;
+
+    const responsesThisWeek = displayJobs.reduce((count, job) => {
+      const emails = Array.isArray(job.emails) ? job.emails : [];
+      const hasResponse = emails.some(
+        (email) =>
+          isInLastSevenDays(email.date) &&
+          ["Recruiter Outreach", "Interview Scheduled", "Offer", "Rejection"].includes(email.type)
+      );
+      return count + (hasResponse ? 1 : 0);
+    }, 0);
+
+    const interviewsThisWeek = displayJobs.reduce((count, job) => {
+      const emails = Array.isArray(job.emails) ? job.emails : [];
+      const hasInterviewSignal = emails.some(
+        (email) => isInLastSevenDays(email.date) && email.type === "Interview Scheduled"
+      );
+      return count + (hasInterviewSignal ? 1 : 0);
+    }, 0);
+
+    const stalledJobs = displayJobs.filter((job) => {
+      if (!["Applied", "Screening"].includes(job.status || "")) {
+        return false;
+      }
+      const anchorDate = toDateSafe(job.appliedDate || job.createdAt);
+      if (!anchorDate) {
+        return false;
+      }
+      const ageInDays = Math.floor((now.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+      return ageInDays >= 14 && !hasActiveFollowUpReminder(job);
+    }).length;
+
+    return {
+      applicationsThisWeek,
+      responsesThisWeek,
+      interviewsThisWeek,
+      stalledJobs,
+    };
+  })();
+  const weeklySummaryDisplay = weeklySummaryApi || weeklySummary;
 
   function getEmailIdentity(email) {
     return email.gmailId || email.id;
@@ -393,16 +339,81 @@ export function DashboardPage() {
     return merged;
   }
 
+  function mergeAutoContacts(currentContacts, sourceJobs) {
+    const existingContacts = Array.isArray(currentContacts) ? currentContacts : [];
+    const byEmail = new Set(
+      existingContacts
+        .map((contact) => String(contact.email || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const byNameCompany = new Set(
+      existingContacts
+        .map((contact) => {
+          const name = String(contact.name || "").trim().toLowerCase();
+          const company = String(contact.company || "").trim().toLowerCase();
+          return name && company ? `${name}::${company}` : "";
+        })
+        .filter(Boolean)
+    );
+
+    const createdContacts = [];
+
+    for (const job of sourceJobs || []) {
+      const recruiterName = String(job?.recruiterName || "").trim();
+      const recruiterEmail = String(job?.recruiterEmail || "").trim();
+      const company = String(job?.company || "").trim();
+
+      if (!recruiterName || !company) {
+        continue;
+      }
+
+      const normalizedEmail = recruiterEmail.toLowerCase();
+      const normalizedNameCompany = `${recruiterName.toLowerCase()}::${company.toLowerCase()}`;
+
+      if ((normalizedEmail && byEmail.has(normalizedEmail)) || byNameCompany.has(normalizedNameCompany)) {
+        continue;
+      }
+
+      const nextContact = {
+        id: `contact_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name: recruiterName,
+        company,
+        title: "Recruiter",
+        email: recruiterEmail,
+        relationship: "Recruiter",
+        notes: `Auto-created from job sync: ${job.role || "Unknown Role"}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      createdContacts.push(nextContact);
+
+      if (normalizedEmail) {
+        byEmail.add(normalizedEmail);
+      }
+      byNameCompany.add(normalizedNameCompany);
+    }
+
+    if (createdContacts.length === 0) {
+      return { nextContacts: existingContacts, addedCount: 0 };
+    }
+
+    return {
+      nextContacts: [...createdContacts, ...existingContacts],
+      addedCount: createdContacts.length,
+    };
+  }
+
   async function loadDashboard() {
     setErrorText("");
     setSuccessText("");
     setLoading(true);
 
     try {
-      const [health, auth, jobsPayload] = await Promise.all([
+      const [health, auth, jobsPayload, weeklyAnalytics] = await Promise.all([
         getHealth(),
         getAuthStatus(),
         getJobs(),
+        getWeeklyAnalytics().catch(() => null),
       ]);
 
       setIsHealthy(health.status === "ok");
@@ -413,7 +424,17 @@ export function DashboardPage() {
       );
       setConnected(Boolean(auth.connected));
       setLastChecked(jobsPayload.lastChecked || auth.lastChecked || null);
-      setJobs((currentJobs) => mergeJobsById(currentJobs, jobsPayload.jobs || []));
+      const mergedJobs = mergeJobsById(jobs, jobsPayload.jobs || []);
+      setJobs(mergedJobs);
+      if (weeklyAnalytics) {
+        setWeeklySummaryApi(weeklyAnalytics);
+      }
+
+      const autoContactResult = mergeAutoContacts(contacts, mergedJobs);
+      if (autoContactResult.addedCount > 0) {
+        saveContacts(autoContactResult.nextContacts);
+      }
+
       if (!auth.connected && (jobsPayload.jobs || []).length === 0) {
         setSuccessText("Connected UI is ready. Connect Gmail to start importing real jobs.");
       }
@@ -433,9 +454,20 @@ export function DashboardPage() {
 
     try {
       const payload = await syncJobs();
-      setJobs((currentJobs) => mergeJobsById(currentJobs, payload.jobs || []));
+      const mergedJobs = mergeJobsById(jobs, payload.jobs || []);
+      setJobs(mergedJobs);
+
+      const autoContactResult = mergeAutoContacts(contacts, mergedJobs);
+      if (autoContactResult.addedCount > 0) {
+        saveContacts(autoContactResult.nextContacts);
+      }
+
       setLastChecked(payload.lastChecked || null);
-      setSuccessText("Sync completed successfully.");
+      setSuccessText(
+        autoContactResult.addedCount > 0
+          ? `Sync completed successfully. ${autoContactResult.addedCount} recruiter contact(s) auto-added.`
+          : "Sync completed successfully."
+      );
     } catch (error) {
       setErrorText(error.message || "Sync failed.");
     } finally {
@@ -483,6 +515,14 @@ export function DashboardPage() {
 
   function handleConnectGmail() {
     window.location.href = `${BACKEND_URL}/auth/gmail`;
+  }
+
+  function handleViewChange(view) {
+    setActiveView(view);
+    const nextPath = getPathForView(view);
+    if (location.pathname !== nextPath) {
+      navigate(nextPath);
+    }
   }
 
   useEffect(() => {
@@ -696,6 +736,52 @@ export function DashboardPage() {
     }));
   }
 
+  function getFollowUpTitle(job) {
+    const company = String(job?.company || "").trim() || "Unknown Company";
+    const role = String(job?.role || "").trim() || "Unknown Role";
+    return `Follow up: ${company} — ${role}`;
+  }
+
+  function hasActiveFollowUpReminder(job, remindersList = reminders) {
+    const expectedTitle = getFollowUpTitle(job).toLowerCase();
+    return remindersList.some(
+      (reminder) =>
+        !reminder.completed &&
+        reminder.type === "Follow Up" &&
+        String(reminder.title || "").toLowerCase() === expectedTitle
+    );
+  }
+
+  function buildFollowUpDueDate(daysAhead = 7) {
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + daysAhead);
+    return dueDate.toISOString().slice(0, 10);
+  }
+
+  function addAutoFollowUpReminder(job) {
+    if (!job || !job.company || !job.role) {
+      return false;
+    }
+
+    if (hasActiveFollowUpReminder(job)) {
+      return false;
+    }
+
+    const nextReminders = [
+      {
+        id: `reminder_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        title: getFollowUpTitle(job),
+        dueDate: buildFollowUpDueDate(7),
+        type: "Follow Up",
+        completed: false,
+      },
+      ...reminders,
+    ];
+
+    saveReminders(nextReminders);
+    return true;
+  }
+
   async function handleSaveJob(event) {
     event.preventDefault();
     setErrorText("");
@@ -725,7 +811,8 @@ export function DashboardPage() {
         const response = await createJob(payload);
         const createdJob = response.job;
         setJobs((currentJobs) => [createdJob, ...currentJobs]);
-        setSuccessText("Job created.");
+        const reminderAdded = addAutoFollowUpReminder(createdJob);
+        setSuccessText(reminderAdded ? "Job created. Follow-up reminder added." : "Job created.");
       }
 
       setJobForm({
@@ -773,6 +860,53 @@ export function DashboardPage() {
     } catch (error) {
       setErrorText(error.message || "Unable to update status.");
     }
+  }
+
+  function handleJobDragStart(jobId) {
+    if (isDemoMode) {
+      return;
+    }
+    setDraggedJobId(jobId);
+  }
+
+  function handleJobDragEnd() {
+    setDraggedJobId(null);
+    setDragOverStatus("");
+  }
+
+  function handleKanbanDragOver(event, status) {
+    if (isDemoMode) {
+      return;
+    }
+    event.preventDefault();
+    if (dragOverStatus !== status) {
+      setDragOverStatus(status);
+    }
+  }
+
+  async function handleKanbanDrop(event, status) {
+    if (isDemoMode) {
+      return;
+    }
+
+    event.preventDefault();
+    const droppedJobId = draggedJobId;
+    setDragOverStatus("");
+
+    if (!droppedJobId) {
+      return;
+    }
+
+    const droppedJob = jobs.find((job) => job.id === droppedJobId);
+    const currentStatus = droppedJob?.status || "Wishlist";
+
+    if (currentStatus === status) {
+      setDraggedJobId(null);
+      return;
+    }
+
+    await handleStatusChange(droppedJobId, status);
+    setDraggedJobId(null);
   }
 
   function handleAnswerChange(questionId, value) {
@@ -894,6 +1028,23 @@ export function DashboardPage() {
     setSuccessText("Reminder deleted.");
   }
 
+  async function handleSendReminderHooks() {
+    setSendingReminderHooks(true);
+    setErrorText("");
+    setSuccessText("");
+
+    try {
+      const result = await sendDueReminderHooks(reminders);
+      setSuccessText(
+        `Reminder hooks triggered for ${result.count || 0} due reminder(s).`
+      );
+    } catch (error) {
+      setErrorText(error.message || "Unable to send reminder hooks.");
+    } finally {
+      setSendingReminderHooks(false);
+    }
+  }
+
   function runAtsCheck() {
     const resumeWords = new Set(
       atsResume
@@ -934,6 +1085,8 @@ export function DashboardPage() {
     setErrorText("");
   }
 
+  const normalizedGlobalSearch = globalSearchQuery.trim().toLowerCase();
+
   const filteredJobs = displayJobs.filter((job) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const queryMatch =
@@ -942,9 +1095,52 @@ export function DashboardPage() {
         .toLowerCase()
         .includes(normalizedQuery);
 
+    const globalMatch =
+      !normalizedGlobalSearch ||
+      `${job.company || ""} ${job.role || ""} ${job.status || ""} ${job.recruiterName || ""}`
+        .toLowerCase()
+        .includes(normalizedGlobalSearch);
+
     const statusMatch = statusFilter === "All" || (job.status || "Wishlist") === statusFilter;
-    return queryMatch && statusMatch;
+
+    const interviewThisWeekMatch = (() => {
+      const weekAhead = new Date();
+      weekAhead.setDate(weekAhead.getDate() + 7);
+      const emails = Array.isArray(job.emails) ? job.emails : [];
+      return emails.some((email) => {
+        if (email.type !== "Interview Scheduled") {
+          return false;
+        }
+        const interviewDate = email.date ? new Date(email.date) : null;
+        return Boolean(interviewDate && !Number.isNaN(interviewDate.getTime()) && interviewDate <= weekAhead);
+      });
+    })();
+
+    const needsFollowUpMatch = (() => {
+      if (!["Applied", "Screening"].includes(job.status || "")) {
+        return false;
+      }
+      const baseDateText = job.appliedDate || job.createdAt;
+      const baseDate = baseDateText ? new Date(baseDateText) : null;
+      if (!baseDate || Number.isNaN(baseDate.getTime())) {
+        return false;
+      }
+      const ageInDays = Math.floor((Date.now() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+      return ageInDays >= 7 && !hasActiveFollowUpReminder(job);
+    })();
+
+    const smartViewMatch =
+      jobSmartView === "All" ||
+      (jobSmartView === "Needs Follow-up" && needsFollowUpMatch) ||
+      (jobSmartView === "Interview This Week" && interviewThisWeekMatch);
+
+    return queryMatch && globalMatch && statusMatch && smartViewMatch;
   });
+
+  const jobTrackerColumns = PIPELINE_ORDER.map((status) => ({
+    status,
+    jobs: filteredJobs.filter((job) => (job.status || "Wishlist") === status),
+  }));
 
   const filteredContacts = contacts.filter((contact) => {
     const normalizedQuery = contactSearch.trim().toLowerCase();
@@ -954,10 +1150,16 @@ export function DashboardPage() {
         .toLowerCase()
         .includes(normalizedQuery);
 
+    const globalMatch =
+      !normalizedGlobalSearch ||
+      `${contact.name || ""} ${contact.company || ""} ${contact.title || ""} ${contact.email || ""}`
+        .toLowerCase()
+        .includes(normalizedGlobalSearch);
+
     const relationshipMatch =
       contactRelationship === "All" || contact.relationship === contactRelationship;
 
-    return queryMatch && relationshipMatch;
+    return queryMatch && relationshipMatch && globalMatch;
   });
 
   const filteredQuestions = INTERVIEW_QUESTIONS.filter((question) =>
@@ -965,6 +1167,143 @@ export function DashboardPage() {
   );
 
   const sortedReminders = [...reminders].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const filteredReminders = sortedReminders.filter((reminder) => {
+    if (!normalizedGlobalSearch) {
+      return true;
+    }
+    return `${reminder.title || ""} ${reminder.type || ""} ${reminder.dueDate || ""}`
+      .toLowerCase()
+      .includes(normalizedGlobalSearch);
+  });
+  const interviewCalendarEvents = displayJobs.flatMap((job) => {
+    const emails = Array.isArray(job.emails) ? job.emails : [];
+    return emails
+      .filter((email) => email.type === "Interview Scheduled")
+      .map((email) => {
+        const parsedDate = email.date ? new Date(email.date) : null;
+        return {
+          id: `interview_${job.id}_${email.gmailId || email.id || Math.random().toString(36).slice(2, 6)}`,
+          title: `Interview: ${job.company || "Unknown Company"} — ${job.role || "Unknown Role"}`,
+          description: `${email.subject || "Interview scheduled"}\nFrom: ${email.from || "Unknown"}`,
+          date: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+        };
+      })
+      .filter((event) => Boolean(event.date));
+  });
+  const needsFollowUpJobs = displayJobs
+    .filter((job) => {
+      if (!["Applied", "Screening"].includes(job.status || "")) {
+        return false;
+      }
+
+      const baseDateText = job.appliedDate || job.createdAt;
+      const baseDate = baseDateText ? new Date(baseDateText) : null;
+      if (!baseDate || Number.isNaN(baseDate.getTime())) {
+        return false;
+      }
+
+      const ageInDays = Math.floor((Date.now() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+      return ageInDays >= 7 && !hasActiveFollowUpReminder(job);
+    })
+    .slice(0, 5);
+
+  function padIcsNumber(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function toIcsDate(dateValue) {
+    const date = new Date(dateValue);
+    return `${date.getUTCFullYear()}${padIcsNumber(date.getUTCMonth() + 1)}${padIcsNumber(date.getUTCDate())}`;
+  }
+
+  function toIcsDateTime(dateValue) {
+    const date = new Date(dateValue);
+    return `${date.getUTCFullYear()}${padIcsNumber(date.getUTCMonth() + 1)}${padIcsNumber(date.getUTCDate())}T${padIcsNumber(date.getUTCHours())}${padIcsNumber(date.getUTCMinutes())}${padIcsNumber(date.getUTCSeconds())}Z`;
+  }
+
+  function escapeIcsText(text) {
+    return String(text || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/\n/g, "\\n")
+      .replace(/,/g, "\\,")
+      .replace(/;/g, "\\;");
+  }
+
+  function buildReminderCalendarEvents() {
+    return sortedReminders
+      .filter((reminder) => reminder.dueDate)
+      .map((reminder) => ({
+        uid: `${reminder.id || `reminder_${Math.random().toString(36).slice(2, 6)}`}@job-search-hub`,
+        title: reminder.title || "Job Search Reminder",
+        description: `Type: ${reminder.type || "Other"}`,
+        allDayDate: reminder.dueDate,
+      }));
+  }
+
+  function buildInterviewCalendarEvents() {
+    return interviewCalendarEvents.map((event) => {
+      const start = event.date;
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      return {
+        uid: `${event.id}@job-search-hub`,
+        title: event.title,
+        description: event.description,
+        startDateTime: start,
+        endDateTime: end,
+      };
+    });
+  }
+
+  function downloadCalendar(events, filename) {
+    if (!events.length) {
+      setErrorText("No calendar events found to export.");
+      return;
+    }
+
+    const nowStamp = toIcsDateTime(new Date());
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Job Search Hub//Calendar Export//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+    ];
+
+    for (const event of events) {
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:${escapeIcsText(event.uid)}`);
+      lines.push(`DTSTAMP:${nowStamp}`);
+      lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
+      lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+      if (event.allDayDate) {
+        lines.push(`DTSTART;VALUE=DATE:${toIcsDate(event.allDayDate)}`);
+      } else {
+        lines.push(`DTSTART:${toIcsDateTime(event.startDateTime)}`);
+        lines.push(`DTEND:${toIcsDateTime(event.endDateTime)}`);
+      }
+      lines.push("END:VEVENT");
+    }
+
+    lines.push("END:VCALENDAR");
+
+    const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setSuccessText("Calendar export downloaded.");
+    setErrorText("");
+  }
+
+  function handleExportAllCalendar() {
+    const reminderEvents = buildReminderCalendarEvents();
+    const interviewEvents = buildInterviewCalendarEvents();
+    downloadCalendar([...reminderEvents, ...interviewEvents], "job-search-calendar.ics");
+  }
 
   function getStatusChipClass(status) {
     return STATUS_CHIP_CLASS[status] || "status-wishlist";
@@ -1016,6 +1355,28 @@ export function DashboardPage() {
               <strong>{stats[card.key]}</strong>
             </article>
           ))}
+          <article className="overview-card tone-blue">
+            <p>Weekly Applications</p>
+            <strong>{weeklySummaryDisplay.applicationsThisWeek}</strong>
+          </article>
+        </section>
+
+        <section className="block">
+          <h3>Weekly Summary</h3>
+          <ul>
+            <li>
+              <strong>Applications:</strong> {weeklySummaryDisplay.applicationsThisWeek}
+            </li>
+            <li>
+              <strong>Responses:</strong> {weeklySummaryDisplay.responsesThisWeek}
+            </li>
+            <li>
+              <strong>Interviews:</strong> {weeklySummaryDisplay.interviewsThisWeek}
+            </li>
+            <li>
+              <strong>Stalled Jobs:</strong> {weeklySummaryDisplay.stalledJobs}
+            </li>
+          </ul>
         </section>
 
         <section className="two-col">
@@ -1048,6 +1409,21 @@ export function DashboardPage() {
               </ul>
             )}
           </article>
+
+          <article className="block">
+            <h3>Needs Follow-up (Smart)</h3>
+            {needsFollowUpJobs.length === 0 ? (
+              <p>No stale applications right now</p>
+            ) : (
+              <ul>
+                {needsFollowUpJobs.map((job) => (
+                  <li key={`smart-followup-${job.id}`}>
+                    <strong>{job.company}</strong> · {job.role}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
         </section>
 
         <section className="pipeline-section">
@@ -1074,6 +1450,159 @@ export function DashboardPage() {
   }
 
   function renderJobTrackerView() {
+    function renderJobTrackerCard(job) {
+      const emails = mergeEmails([], job.emails || []);
+      const isExpanded = Boolean(expandedJobs[job.id]);
+      const hasUnreadRealEmail = emails.some((email) => email.isReal && !email.isRead);
+
+      return (
+        <article
+          key={job.id}
+          className={`tracker-card card-${getStatusChipClass(job.status || "Wishlist")} ${
+            isDemoMode ? "" : "is-draggable"
+          } ${draggedJobId === job.id ? "is-dragging" : ""}`}
+          draggable={!isDemoMode}
+          onDragStart={() => handleJobDragStart(job.id)}
+          onDragEnd={handleJobDragEnd}
+        >
+          <header
+            className="tracker-card-header"
+            role="button"
+            tabIndex={0}
+            onClick={() => toggleJobExpanded(job.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleJobExpanded(job.id);
+              }
+            }}
+          >
+            <div>
+              <h4>{job.role || "Unknown Role"}</h4>
+              <p>
+                <strong>{job.company || "Unknown Company"}</strong>
+              </p>
+              <p>{job.location || "Location not set"}</p>
+              <p>Applied: {job.appliedDate || "Unknown"}</p>
+            </div>
+            <div className="tracker-card-badges">
+              <span className={`chip ${getStatusChipClass(job.status || "Wishlist")}`}>
+                {job.status || "Wishlist"}
+              </span>
+              <span className="chip email-count-badge">
+                {emails.length} emails
+                {hasUnreadRealEmail && <span className="email-unread-dot" />}
+              </span>
+            </div>
+          </header>
+
+          {isExpanded && (
+            <>
+              <p>{job.recruiterName || "Recruiter not available"}</p>
+
+              <div className="email-thread-panel">
+                {emails.length === 0 ? (
+                  <p className="muted">No emails yet — will auto-populate from Gmail</p>
+                ) : (
+                  <div className="email-timeline">
+                    <div className="email-timeline-line" />
+                    {emails.map((email) => (
+                      <article
+                        key={getEmailIdentity(email) || email.id}
+                        className={`email-mini-card ${email.isReal ? "email-real" : "email-auto"}`}
+                        onDoubleClick={() => handleEmailCardDoubleClick(job.id, email)}
+                        title="Double-click to read full email"
+                      >
+                        <div className="email-timeline-dot-wrap">
+                          <span className={`email-timeline-dot ${getEmailTypeClass(email.type)}`} />
+                        </div>
+                        <div className="email-mini-content">
+                          <div className="email-mini-top">
+                            <div>
+                              <p className="email-sender-name">{email.fromName || "Unknown Sender"}</p>
+                              <p className="email-sender-address">{email.from || ""}</p>
+                            </div>
+                            <p className="email-date-text">{formatEmailDate(email.date)}</p>
+                          </div>
+                          <p className="email-subject">{email.subject || "No subject"}</p>
+                          <p className="email-preview">{email.body || email.preview || "No message available"}</p>
+                          <div className="control-row">
+                            <span className={`chip ${getEmailTypeClass(email.type)}`}>
+                              {email.type || "Auto / Tracking"}
+                            </span>
+                            <span className={`chip ${email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
+                              {email.isReal ? "Real email" : "Auto / Tracking email"}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {activeEmailModal && activeEmailModal.jobId === job.id && (
+                <div className="email-modal-overlay" onClick={closeEmailModal}>
+                  <section className="email-modal" onClick={(event) => event.stopPropagation()}>
+                    <button type="button" className="email-modal-close" onClick={closeEmailModal}>
+                      ×
+                    </button>
+                    <h3>{activeEmailModal.email.subject || "No subject"}</h3>
+                    <p>
+                      <strong>{activeEmailModal.email.fromName || "Unknown Sender"}</strong>
+                    </p>
+                    <p>{activeEmailModal.email.from || ""}</p>
+                    <p className="muted">{formatEmailDate(activeEmailModal.email.date)}</p>
+                    <div className="control-row">
+                      <span className={`chip ${getEmailTypeClass(activeEmailModal.email.type)}`}>
+                        {activeEmailModal.email.type || "Auto / Tracking"}
+                      </span>
+                      <span className={`chip ${activeEmailModal.email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
+                        {activeEmailModal.email.isReal ? "Real email" : "Auto / Tracking email"}
+                      </span>
+                    </div>
+                    <pre className="email-modal-body">{activeEmailModal.email.body || "No body text available"}</pre>
+                  </section>
+                </div>
+              )}
+
+              <div className="control-row">
+                <select
+                  value={job.status || "Wishlist"}
+                  onChange={(event) => handleStatusChange(job.id, event.target.value)}
+                  disabled={isDemoMode}
+                >
+                  {PIPELINE_ORDER.map((status) => (
+                    <option key={`${job.id}-${status}`} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => handleEditJob(job)} disabled={isDemoMode}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(job.imported) || isDemoMode}
+                  onClick={() => handleMarkImported(job.id)}
+                >
+                  {job.imported ? "Imported" : "Mark Imported"}
+                </button>
+                <button
+                  type="button"
+                  className="danger-btn"
+                  disabled={isDemoMode}
+                  onClick={() => handleDelete(job.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </article>
+      );
+    }
+
     return (
       <section className="module-panel">
         <header className="module-header">
@@ -1140,6 +1669,11 @@ export function DashboardPage() {
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search company, role, status"
           />
+          <select value={jobSmartView} onChange={(event) => setJobSmartView(event.target.value)}>
+            <option value="All">Smart View: All</option>
+            <option value="Needs Follow-up">Smart View: Needs Follow-up</option>
+            <option value="Interview This Week">Smart View: Interview This Week</option>
+          </select>
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="All">All Statuses</option>
             {PIPELINE_ORDER.map((status) => (
@@ -1158,156 +1692,28 @@ export function DashboardPage() {
           ))}
         </div>
 
-        <div className="job-list-grid">
-          {filteredJobs.map((job) => {
-            const emails = mergeEmails([], job.emails || []);
-            const isExpanded = Boolean(expandedJobs[job.id]);
-            const hasUnreadRealEmail = emails.some((email) => email.isReal && !email.isRead);
+        <div className="job-kanban-grid">
+          {jobTrackerColumns.map((column) => (
+            <section
+              key={`job-kanban-${column.status}`}
+              className={`job-kanban-column ${dragOverStatus === column.status ? "is-drop-target" : ""}`}
+              onDragOver={(event) => handleKanbanDragOver(event, column.status)}
+              onDrop={(event) => handleKanbanDrop(event, column.status)}
+            >
+              <header className="job-kanban-column-header">
+                <h4>{column.status}</h4>
+                <span className={`chip ${getStatusChipClass(column.status)}`}>{column.jobs.length}</span>
+              </header>
 
-            return (
-              <article
-                key={job.id}
-                className={`tracker-card card-${getStatusChipClass(job.status || "Wishlist")}`}
-              >
-                <header
-                  className="tracker-card-header"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => toggleJobExpanded(job.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      toggleJobExpanded(job.id);
-                    }
-                  }}
-                >
-                  <div>
-                    <h4>{job.role || "Unknown Role"}</h4>
-                    <p>
-                      <strong>{job.company || "Unknown Company"}</strong>
-                    </p>
-                    <p>{job.location || "Location not set"}</p>
-                    <p>Applied: {job.appliedDate || "Unknown"}</p>
-                  </div>
-                  <div className="tracker-card-badges">
-                    <span className={`chip ${getStatusChipClass(job.status || "Wishlist")}`}>
-                      {job.status || "Wishlist"}
-                    </span>
-                    <span className="chip email-count-badge">
-                      {emails.length} emails
-                      {hasUnreadRealEmail && <span className="email-unread-dot" />}
-                    </span>
-                  </div>
-                </header>
-
-                {isExpanded && (
-                  <>
-                    <p>{job.recruiterName || "Recruiter not available"}</p>
-
-                    <div className="email-thread-panel">
-                      {emails.length === 0 ? (
-                        <p className="muted">No emails yet — will auto-populate from Gmail</p>
-                      ) : (
-                        <div className="email-timeline">
-                          <div className="email-timeline-line" />
-                          {emails.map((email) => (
-                            <article
-                              key={getEmailIdentity(email) || email.id}
-                              className={`email-mini-card ${email.isReal ? "email-real" : "email-auto"}`}
-                              onDoubleClick={() => handleEmailCardDoubleClick(job.id, email)}
-                              title="Double-click to read full email"
-                            >
-                              <div className="email-timeline-dot-wrap">
-                                <span className={`email-timeline-dot ${getEmailTypeClass(email.type)}`} />
-                              </div>
-                              <div className="email-mini-content">
-                                <div className="email-mini-top">
-                                  <div>
-                                    <p className="email-sender-name">{email.fromName || "Unknown Sender"}</p>
-                                    <p className="email-sender-address">{email.from || ""}</p>
-                                  </div>
-                                  <p className="email-date-text">{formatEmailDate(email.date)}</p>
-                                </div>
-                                <p className="email-subject">{email.subject || "No subject"}</p>
-                                <p className="email-preview">{email.body || email.preview || "No message available"}</p>
-                                <div className="control-row">
-                                  <span className={`chip ${getEmailTypeClass(email.type)}`}>
-                                    {email.type || "Auto / Tracking"}
-                                  </span>
-                                  <span className={`chip ${email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
-                                    {email.isReal ? "Real email" : "Auto / Tracking email"}
-                                  </span>
-                                </div>
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {activeEmailModal && activeEmailModal.jobId === job.id && (
-                      <div className="email-modal-overlay" onClick={closeEmailModal}>
-                        <section className="email-modal" onClick={(event) => event.stopPropagation()}>
-                          <button type="button" className="email-modal-close" onClick={closeEmailModal}>
-                            ×
-                          </button>
-                          <h3>{activeEmailModal.email.subject || "No subject"}</h3>
-                          <p>
-                            <strong>{activeEmailModal.email.fromName || "Unknown Sender"}</strong>
-                          </p>
-                          <p>{activeEmailModal.email.from || ""}</p>
-                          <p className="muted">{formatEmailDate(activeEmailModal.email.date)}</p>
-                          <div className="control-row">
-                            <span className={`chip ${getEmailTypeClass(activeEmailModal.email.type)}`}>
-                              {activeEmailModal.email.type || "Auto / Tracking"}
-                            </span>
-                            <span className={`chip ${activeEmailModal.email.isReal ? "email-real-badge" : "email-auto-badge"}`}>
-                              {activeEmailModal.email.isReal ? "Real email" : "Auto / Tracking email"}
-                            </span>
-                          </div>
-                          <pre className="email-modal-body">{activeEmailModal.email.body || "No body text available"}</pre>
-                        </section>
-                      </div>
-                    )}
-
-                    <div className="control-row">
-                      <select
-                        value={job.status || "Wishlist"}
-                        onChange={(event) => handleStatusChange(job.id, event.target.value)}
-                        disabled={isDemoMode}
-                      >
-                        {PIPELINE_ORDER.map((status) => (
-                          <option key={`${job.id}-${status}`} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={() => handleEditJob(job)} disabled={isDemoMode}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(job.imported) || isDemoMode}
-                        onClick={() => handleMarkImported(job.id)}
-                      >
-                        {job.imported ? "Imported" : "Mark Imported"}
-                      </button>
-                      <button
-                        type="button"
-                        className="danger-btn"
-                        disabled={isDemoMode}
-                        onClick={() => handleDelete(job.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </article>
-            );
-          })}
-          {filteredJobs.length === 0 && <p className="muted">No jobs match the current filters.</p>}
+              <div className="job-kanban-list">
+                {column.jobs.map((job) => renderJobTrackerCard(job))}
+                {column.jobs.length === 0 && <p className="muted">No jobs</p>}
+              </div>
+            </section>
+          ))}
         </div>
+
+        {filteredJobs.length === 0 && <p className="muted">No jobs match the current filters.</p>}
       </section>
     );
   }
@@ -1465,13 +1871,64 @@ export function DashboardPage() {
       .trim();
   }
 
+  async function loadArchiveFiles() {
+    setArchiveLoading(true);
+    setErrorText("");
+    try {
+      const response = await fetch(`${BACKEND_URL}/templates/archive/files`);
+      if (!response.ok) {
+        throw new Error("Unable to load archive files.");
+      }
+      const payload = await response.json();
+      const files = Array.isArray(payload?.files) ? payload.files : [];
+      setArchiveFiles(files);
+      if (files.length > 0 && !archiveSelectedPath) {
+        setArchiveSelectedPath(files[0].path || "");
+      }
+      if (files.length === 0) {
+        setArchiveSelectedPath("");
+        setArchiveContent("");
+      }
+    } catch {
+      setArchiveFiles([]);
+      setArchiveSelectedPath("");
+      setArchiveContent("");
+    } finally {
+      setArchiveLoading(false);
+    }
+  }
+
+  async function handleLoadArchiveContent() {
+    if (!archiveSelectedPath) {
+      return;
+    }
+
+    setArchiveLoading(true);
+    setErrorText("");
+    try {
+      const encodedPath = encodeURIComponent(archiveSelectedPath);
+      const response = await fetch(`${BACKEND_URL}/templates/archive/content?path=${encodedPath}`);
+      if (!response.ok) {
+        throw new Error("Unable to load archive content.");
+      }
+      const payload = await response.json();
+      setArchiveContent(payload?.content || "");
+    } catch {
+      setArchiveContent("");
+      setErrorText("Archive content is unavailable right now.");
+    } finally {
+      setArchiveLoading(false);
+    }
+  }
+
   function renderTemplatesView() {
     const filteredTemplates = TEMPLATES.filter((template) => {
       const typeMatch = templateType === "All" ? true : template.type === templateType;
       const searchText = `${template.name || ""} ${template.sub || ""} ${template.body || ""} case ${template.case}`.toLowerCase();
       const searchMatch =
         !templateSearch.trim() || searchText.includes(templateSearch.trim().toLowerCase());
-      return typeMatch && searchMatch;
+      const globalMatch = !normalizedGlobalSearch || searchText.includes(normalizedGlobalSearch);
+      return typeMatch && searchMatch && globalMatch;
     });
 
     return (
@@ -1698,12 +2155,25 @@ export function DashboardPage() {
   }
 
   function renderRemindersView() {
+    const reminderEventsCount = sortedReminders.filter((reminder) => Boolean(reminder.dueDate)).length;
+    const interviewEventsCount = interviewCalendarEvents.length;
+
     return (
       <section className="module-panel">
         <header className="module-header">
           <div>
             <h1>Reminders</h1>
             <p>Track follow-ups, deadlines, and preparation tasks.</p>
+          </div>
+          <div className="control-row">
+            <span className="chip">{reminderEventsCount} reminder events</span>
+            <span className="chip">{interviewEventsCount} interview events</span>
+            <button type="button" onClick={handleExportAllCalendar}>
+              Export Calendar (.ics)
+            </button>
+            <button type="button" onClick={handleSendReminderHooks} disabled={sendingReminderHooks}>
+              {sendingReminderHooks ? "Sending Hooks..." : "Send Due Reminder Hooks"}
+            </button>
           </div>
         </header>
 
@@ -1731,7 +2201,7 @@ export function DashboardPage() {
         </form>
 
         <div className="reminder-list">
-          {sortedReminders.map((reminder) => {
+          {filteredReminders.map((reminder) => {
             const isOverdue = !reminder.completed && reminder.dueDate < new Date().toISOString().slice(0, 10);
             return (
               <article key={reminder.id} className={`reminder-card ${isOverdue ? "overdue" : ""}`}>
@@ -1751,7 +2221,7 @@ export function DashboardPage() {
               </article>
             );
           })}
-          {sortedReminders.length === 0 && <p className="muted">No reminders yet.</p>}
+          {filteredReminders.length === 0 && <p className="muted">No reminders yet.</p>}
         </div>
       </section>
     );
@@ -1815,6 +2285,11 @@ export function DashboardPage() {
         <div className="brand">
           <h2>Job Search Hub</h2>
           <p>Manikanth Nampally</p>
+          <input
+            value={globalSearchQuery}
+            onChange={(event) => setGlobalSearchQuery(event.target.value)}
+            placeholder="Global search"
+          />
         </div>
 
         <nav className="menu">
@@ -1823,7 +2298,7 @@ export function DashboardPage() {
               key={item}
               type="button"
               className={`menu-item ${activeView === item ? "active" : ""}`}
-              onClick={() => setActiveView(item)}
+              onClick={() => handleViewChange(item)}
             >
               {item}
             </button>
@@ -1845,16 +2320,7 @@ export function DashboardPage() {
         {activeView === "Outreach" && renderOutreachView()}
         {activeView === "Reminders" && renderRemindersView()}
         {activeView === "ATS Checker" && renderAtsCheckerView()}
-        {![
-          "Dashboard",
-          "Job Tracker",
-          "Contacts",
-          "Templates",
-          "Interview Prep",
-          "Outreach",
-          "Reminders",
-          "ATS Checker",
-        ].includes(activeView) &&
+        {!NAV_ITEMS.includes(activeView) &&
           renderPlaceholderView()}
       </main>
     </div>
