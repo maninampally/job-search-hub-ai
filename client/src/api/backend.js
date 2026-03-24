@@ -95,3 +95,17 @@ export async function getArchiveTemplateContent(relativePath) {
 	const response = await fetch(`${BACKEND_URL}/templates/archive/content?path=${encodedPath}`);
 	return parseResponse(response);
 }
+
+export async function getWeeklyAnalytics() {
+	const response = await fetch(`${BACKEND_URL}/jobs/analytics/weekly`);
+	return parseResponse(response);
+}
+
+export async function sendDueReminderHooks(reminders) {
+	const response = await fetch(`${BACKEND_URL}/jobs/notifications/hooks/due-reminders`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ reminders }),
+	});
+	return parseResponse(response);
+}
