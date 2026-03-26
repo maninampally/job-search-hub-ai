@@ -11,9 +11,9 @@ const {
 } = require("../store/dataStore");
 const { fetchJobEmails } = require("../services/jobSync");
 const { env } = require("../config/env");
+const { VALID_STATUSES } = require("../config/constants");
 
 const mcpRoutes = express.Router();
-const VALID_STATUSES = new Set(["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"]);
 const toolRateState = new Map();
 
 const archiveBasePath = path.resolve(
