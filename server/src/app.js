@@ -6,6 +6,7 @@ const { authRoutes } = require("./routes/authRoutes");
 const { jobRoutes } = require("./routes/jobRoutes");
 const { healthRoutes } = require("./routes/healthRoutes");
 const { templateRoutes } = require("./routes/templateRoutes");
+const { resumeRoutes } = require("./routes/resumeRoutes");
 const { mcpRoutes } = require("./routes/mcpRoutes");
 
 function createApp() {
@@ -40,6 +41,7 @@ function createApp() {
 
   app.use("/auth", authRoutes);
   app.use("/jobs", jobRoutes);
+  app.use("/resumes", resumeRoutes);
   app.use("/templates", templateRoutes);
   app.use("/health", healthRoutes);
   app.use("/mcp", mcpRoutes);

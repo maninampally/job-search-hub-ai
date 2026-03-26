@@ -8,12 +8,15 @@ import {
   getAuthStatus,
   getHealth,
   getJobs,
+  getResumes,
   getWeeklyAnalytics,
   markJobImported,
   sendDueReminderHooks,
   syncJobs,
   updateJob,
 } from "../api/backend";
+import { getEmailIdentity, normalizeEmailItem, mergeEmails } from "../utils/emailUtils";
+import JobListView from "../components/JobListView";
 import { INTERVIEW_QUESTIONS } from "./dashboard/interviewData";
 import { getPathForView, NAV_ITEMS } from "./dashboard/routeConfig";
 import { TEMPLATES } from "./dashboard/templatesData";
@@ -107,6 +110,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
   const [connected, setConnected] = useState(false);
   const [lastChecked, setLastChecked] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [resumes, setResumes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [errorText, setErrorText] = useState("");
@@ -204,115 +208,13 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     .filter((job) => ["Applied", "Screening", "Interview"].includes(job.status || ""))
     .slice(0, 3);
 
-  const weeklySummary = (() => {
-    const now = new Date();
-    const weekAgo = new Date(now);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    function toDateSafe(value) {
-      if (!value) {
-        return null;
-      }
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-
-    function isInLastSevenDays(value) {
-      const parsed = toDateSafe(value);
-      return Boolean(parsed && parsed >= weekAgo && parsed <= now);
-    }
-
-    const applicationsThisWeek = displayJobs.filter((job) => {
-      return isInLastSevenDays(job.createdAt || job.appliedDate);
-    }).length;
-
-    const responsesThisWeek = displayJobs.reduce((count, job) => {
-      const emails = Array.isArray(job.emails) ? job.emails : [];
-      const hasResponse = emails.some(
-        (email) =>
-          isInLastSevenDays(email.date) &&
-          ["Recruiter Outreach", "Interview Scheduled", "Offer", "Rejection"].includes(email.type)
-      );
-      return count + (hasResponse ? 1 : 0);
-    }, 0);
-
-    const interviewsThisWeek = displayJobs.reduce((count, job) => {
-      const emails = Array.isArray(job.emails) ? job.emails : [];
-      const hasInterviewSignal = emails.some(
-        (email) => isInLastSevenDays(email.date) && email.type === "Interview Scheduled"
-      );
-      return count + (hasInterviewSignal ? 1 : 0);
-    }, 0);
-
-    const stalledJobs = displayJobs.filter((job) => {
-      if (!["Applied", "Screening"].includes(job.status || "")) {
-        return false;
-      }
-      const anchorDate = toDateSafe(job.appliedDate || job.createdAt);
-      if (!anchorDate) {
-        return false;
-      }
-      const ageInDays = Math.floor((now.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
-      return ageInDays >= 14 && !hasActiveFollowUpReminder(job);
-    }).length;
-
-    return {
-      applicationsThisWeek,
-      responsesThisWeek,
-      interviewsThisWeek,
-      stalledJobs,
-    };
-  })();
-  const weeklySummaryDisplay = weeklySummaryApi || weeklySummary;
-
-  function getEmailIdentity(email) {
-    return email.gmailId || email.id;
-  }
-
-  function normalizeEmailItem(email) {
-    const identity = getEmailIdentity(email);
-    return {
-      id: email.id || identity || `email_${Math.random().toString(36).slice(2, 8)}`,
-      from: email.from || "",
-      fromName: email.fromName || email.from || "Unknown Sender",
-      subject: email.subject || "No subject",
-      preview: email.preview || "",
-      body: email.body || "",
-      date: email.date || new Date().toISOString(),
-      type: email.type || "Auto / Tracking",
-      isReal: Boolean(email.isReal),
-      gmailId: email.gmailId || "",
-      isRead: Boolean(emailReadMap[identity]) || Boolean(email.isRead),
-    };
-  }
-
-  function mergeEmails(currentEmails, incomingEmails) {
-    const byId = new Map();
-
-    for (const item of currentEmails || []) {
-      const normalized = normalizeEmailItem(item);
-      byId.set(getEmailIdentity(normalized) || normalized.id, normalized);
-    }
-
-    for (const item of incomingEmails || []) {
-      const normalized = normalizeEmailItem(item);
-      const identity = getEmailIdentity(normalized) || normalized.id;
-      if (!byId.has(identity)) {
-        byId.set(identity, normalized);
-      } else {
-        const existing = byId.get(identity);
-        byId.set(identity, {
-          ...existing,
-          ...normalized,
-          isRead: Boolean(existing.isRead || normalized.isRead),
-        });
-      }
-    }
-
-    return Array.from(byId.values()).sort(
-      (first, second) => new Date(first.date).getTime() - new Date(second.date).getTime()
-    );
-  }
+  // Weekly summary now comes from API only
+  const weeklySummaryDisplay = weeklySummaryApi || {
+    applicationsThisWeek: 0,
+    responsesThisWeek: 0,
+    interviewsThisWeek: 0,
+    stalledJobs: 0,
+  };
 
   function mergeJobsById(currentJobs, incomingJobs) {
     const currentById = new Map((currentJobs || []).map((job) => [job.id, job]));
@@ -320,7 +222,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
 
     for (const incomingJob of incomingJobs || []) {
       const existing = currentById.get(incomingJob.id);
-      const mergedEmails = mergeEmails(existing?.emails || [], incomingJob.emails || []);
+      const mergedEmails = mergeEmails(existing?.emails || [], incomingJob.emails || [], emailReadMap);
       merged.push({
         ...(existing || {}),
         ...incomingJob,
@@ -332,7 +234,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     for (const leftover of currentById.values()) {
       merged.push({
         ...leftover,
-        emails: mergeEmails(leftover.emails || [], []),
+        emails: mergeEmails(leftover.emails || [], [], emailReadMap),
       });
     }
 
@@ -409,11 +311,12 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     setLoading(true);
 
     try {
-      const [health, auth, jobsPayload, weeklyAnalytics] = await Promise.all([
+      const [health, auth, jobsPayload, weeklyAnalytics, resumesPayload] = await Promise.all([
         getHealth(),
         getAuthStatus(),
         getJobs(),
         getWeeklyAnalytics().catch(() => null),
+        getResumes().catch(() => ({ resumes: [] })),
       ]);
 
       setIsHealthy(health.status === "ok");
@@ -426,6 +329,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       setLastChecked(jobsPayload.lastChecked || auth.lastChecked || null);
       const mergedJobs = mergeJobsById(jobs, jobsPayload.jobs || []);
       setJobs(mergedJobs);
+      setResumes(resumesPayload.resumes || []);
       if (weeklyAnalytics) {
         setWeeklySummaryApi(weeklyAnalytics);
       }
@@ -859,6 +763,21 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       setSuccessText("Job status updated.");
     } catch (error) {
       setErrorText(error.message || "Unable to update status.");
+    }
+  }
+
+  async function handleAttachResume(jobId, resumeId) {
+    setErrorText("");
+    setSuccessText("");
+    try {
+      await updateJob(jobId, { attachedResumeId: resumeId || null });
+      setJobs((currentJobs) =>
+        currentJobs.map((job) => (job.id === jobId ? { ...job, attachedResumeId: resumeId || null } : job))
+      );
+      const resumeName = resumeId ? resumes.find((r) => r.id === resumeId)?.name : "None";
+      setSuccessText(`Resume attached: ${resumeName}`);
+    } catch (error) {
+      setErrorText(error.message || "Unable to attach resume.");
     }
   }
 
@@ -1566,6 +1485,32 @@ export function DashboardPage({ routeView = "Dashboard" }) {
                 </div>
               )}
 
+              <div className="resume-attachment-section" style={{ marginTop: "16px", padding: "12px", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>
+                  Attach Resume for this Role
+                </label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <select
+                    value={job.attachedResumeId || ""}
+                    onChange={(event) => handleAttachResume(job.id, event.target.value)}
+                    disabled={isDemoMode}
+                    style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid #ddd" }}
+                  >
+                    <option value="">-- No resume attached --</option>
+                    {resumes.map((resume) => (
+                      <option key={resume.id} value={resume.id}>
+                        {resume.name} ({resume.mimeType === "application/pdf" ? "PDF" : "DOCX"})
+                      </option>
+                    ))}
+                  </select>
+                  {job.attachedResumeId && (
+                    <p style={{ margin: "0", fontSize: "12px", color: "#667eea", fontWeight: "500" }}>
+                      ✓ Attached
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="control-row">
                 <select
                   value={job.status || "Wishlist"}
@@ -1692,26 +1637,11 @@ export function DashboardPage({ routeView = "Dashboard" }) {
           ))}
         </div>
 
-        <div className="job-kanban-grid">
-          {jobTrackerColumns.map((column) => (
-            <section
-              key={`job-kanban-${column.status}`}
-              className={`job-kanban-column ${dragOverStatus === column.status ? "is-drop-target" : ""}`}
-              onDragOver={(event) => handleKanbanDragOver(event, column.status)}
-              onDrop={(event) => handleKanbanDrop(event, column.status)}
-            >
-              <header className="job-kanban-column-header">
-                <h4>{column.status}</h4>
-                <span className={`chip ${getStatusChipClass(column.status)}`}>{column.jobs.length}</span>
-              </header>
-
-              <div className="job-kanban-list">
-                {column.jobs.map((job) => renderJobTrackerCard(job))}
-                {column.jobs.length === 0 && <p className="muted">No jobs</p>}
-              </div>
-            </section>
-          ))}
-        </div>
+        <JobListView 
+          jobs={jobTrackerColumns.map(col => col.jobs).flat()}
+          resumes={resumes}
+          onJobUpdate={loadDashboard}
+        />
 
         {filteredJobs.length === 0 && <p className="muted">No jobs match the current filters.</p>}
       </section>
@@ -2227,58 +2157,6 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     );
   }
 
-  function renderAtsCheckerView() {
-    return (
-      <section className="module-panel">
-        <header className="module-header">
-          <div>
-            <h1>ATS Checker</h1>
-            <p>Paste resume and JD text to evaluate keyword match and improvement ideas.</p>
-          </div>
-        </header>
-
-        {successText && <div className="inline-note success">{successText}</div>}
-        {errorText && <div className="inline-note error">{errorText}</div>}
-
-        <div className="ats-grid">
-          <textarea
-            value={atsResume}
-            onChange={(event) => setAtsResume(event.target.value)}
-            placeholder="Paste resume text"
-          />
-          <textarea
-            value={atsJobDescription}
-            onChange={(event) => setAtsJobDescription(event.target.value)}
-            placeholder="Paste job description text"
-          />
-        </div>
-
-        <div className="control-row">
-          <button type="button" onClick={runAtsCheck}>
-            Run ATS Check
-          </button>
-        </div>
-
-        {atsResult && (
-          <section className="ats-result">
-            <h3>Score: {atsResult.score}%</h3>
-            <p>{atsResult.suggestion}</p>
-            <div className="ats-columns">
-              <div>
-                <h4>Matched Keywords</h4>
-                <p className="muted">{atsResult.matched.join(", ") || "None"}</p>
-              </div>
-              <div>
-                <h4>Missing Keywords</h4>
-                <p className="muted">{atsResult.missing.join(", ") || "None"}</p>
-              </div>
-            </div>
-          </section>
-        )}
-      </section>
-    );
-  }
-
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -2319,7 +2197,6 @@ export function DashboardPage({ routeView = "Dashboard" }) {
         {activeView === "Interview Prep" && renderInterviewPrepView()}
         {activeView === "Outreach" && renderOutreachView()}
         {activeView === "Reminders" && renderRemindersView()}
-        {activeView === "ATS Checker" && renderAtsCheckerView()}
         {!NAV_ITEMS.includes(activeView) &&
           renderPlaceholderView()}
       </main>
