@@ -11,6 +11,7 @@ function createInitialMemory() {
     jobs: [],
     emailsByJob: {},
     statusTimelineByJob: {},
+    resumes: [],
     lastChecked: null,
     processedIds: new Set(),
   };
@@ -47,11 +48,19 @@ function loadLocalMemory() {
       }
     }
 
+    const parsedResumes = Array.isArray(parsed.resumes)
+      ? parsed.resumes.map((resume) => ({
+          ...resume,
+          fileBuffer: null, // Re-loaded from upload when needed
+        }))
+      : [];
+
     return {
       tokens: parsed.tokens || null,
       jobs: parsedJobs,
       emailsByJob: parsedEmailsByJob,
       statusTimelineByJob: parsedTimelineByJob,
+      resumes: parsedResumes,
       lastChecked: parsed.lastChecked || null,
       processedIds: new Set(Array.isArray(parsed.processedIds) ? parsed.processedIds : []),
     };
@@ -67,6 +76,19 @@ function saveLocalMemory(memory) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
+    // Don't save file buffers - they're too large
+    const resumesForStorage = (memory.resumes || []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      fileName: r.fileName,
+      mimeType: r.mimeType,
+      fileSize: r.fileSize,
+      uploadedAt: r.uploadedAt,
+      linkedJobId: r.linkedJobId,
+      version: r.version,
+      updatedAt: r.updatedAt,
+    }));
+
     fs.writeFileSync(
       localStorePath,
       JSON.stringify(
@@ -75,6 +97,7 @@ function saveLocalMemory(memory) {
           jobs: memory.jobs,
           emailsByJob: memory.emailsByJob,
           statusTimelineByJob: memory.statusTimelineByJob,
+          resumes: resumesForStorage,
           lastChecked: memory.lastChecked,
           processedIds: Array.from(memory.processedIds),
         },
@@ -378,6 +401,7 @@ async function updateJob(jobId, partialJob) {
   if (partialJob.nextStep !== undefined) patch.next_step = partialJob.nextStep;
   if (partialJob.imported !== undefined) patch.imported = partialJob.imported;
   if (partialJob.source !== undefined) patch.source = partialJob.source;
+  if (partialJob.attachedResumeId !== undefined) patch.attached_resume_id = partialJob.attachedResumeId;
 
   const { error } = await supabase.from("jobs").update(patch).eq("id", jobId);
   if (error) {
@@ -514,6 +538,36 @@ async function addJobEmail(jobId, email) {
   return nextEmails;
 }
 
+// Resume Management Methods
+function getResumes() {
+  return memory.resumes || [];
+}
+
+function addResume(resumeMetadata) {
+  if (!memory.resumes) memory.resumes = [];
+  memory.resumes.push(resumeMetadata);
+  saveLocalMemory(memory);
+  return resumeMetadata;
+}
+
+function getResumeById(resumeId) {
+  return (memory.resumes || []).find((r) => r.id === resumeId) || null;
+}
+
+function updateResume(updatedResume) {
+  const index = (memory.resumes || []).findIndex((r) => r.id === updatedResume.id);
+  if (index >= 0) {
+    memory.resumes[index] = updatedResume;
+    saveLocalMemory(memory);
+  }
+  return updatedResume;
+}
+
+function deleteResume(resumeId) {
+  memory.resumes = (memory.resumes || []).filter((r) => r.id !== resumeId);
+  saveLocalMemory(memory);
+}
+
 module.exports = {
   getTokens,
   setTokens,
@@ -530,4 +584,9 @@ module.exports = {
   getJobEmails,
   addJobEmail,
   getJobStatusTimeline,
+  getResumes,
+  addResume,
+  getResumeById,
+  updateResume,
+  deleteResume,
 };

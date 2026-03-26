@@ -13,9 +13,9 @@ const {
 } = require("../store/dataStore");
 const { backfillJobEmailsFromExistingJobs, fetchJobEmails } = require("../services/jobSync");
 const { env } = require("../config/env");
+const { VALID_STATUSES, EMAIL_TYPES } = require("../config/constants");
 
 const jobRoutes = express.Router();
-const VALID_STATUSES = new Set(["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"]);
 
 function isValidDateInput(value) {
   if (value === null || value === undefined || value === "") {
