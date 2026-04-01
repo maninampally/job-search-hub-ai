@@ -7,7 +7,11 @@ const { jobRoutes } = require("./routes/jobRoutes");
 const { healthRoutes } = require("./routes/healthRoutes");
 const { templateRoutes } = require("./routes/templateRoutes");
 const { resumeRoutes } = require("./routes/resumeRoutes");
+const { contactRoutes } = require("./routes/contactRoutes");
+const { reminderRoutes } = require("./routes/reminderRoutes");
+const { outreachRoutes } = require("./routes/outreachRoutes");
 const { mcpRoutes } = require("./routes/mcpRoutes");
+const { requireUserAuth } = require("./middleware/requireUserAuth");
 
 function createApp() {
   const app = express();
@@ -40,9 +44,12 @@ function createApp() {
   );
 
   app.use("/auth", authRoutes);
-  app.use("/jobs", jobRoutes);
-  app.use("/resumes", resumeRoutes);
-  app.use("/templates", templateRoutes);
+  app.use("/jobs", requireUserAuth, jobRoutes);
+  app.use("/resumes", requireUserAuth, resumeRoutes);
+  app.use("/contacts", requireUserAuth, contactRoutes);
+  app.use("/reminders", requireUserAuth, reminderRoutes);
+  app.use("/outreach", requireUserAuth, outreachRoutes);
+  app.use("/templates", requireUserAuth, templateRoutes);
   app.use("/health", healthRoutes);
   app.use("/mcp", mcpRoutes);
 
