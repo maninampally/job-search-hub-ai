@@ -2,6 +2,7 @@ const express = require("express");
 const {
   addJobEmail,
   addJob,
+  addStatusChange,
   deleteJob,
   getJobEmails,
   getJobStatusTimeline,
@@ -12,10 +13,15 @@ const {
   updateJob,
 } = require("../store/dataStore");
 const { backfillJobEmailsFromExistingJobs, fetchJobEmails } = require("../services/jobSync");
+const { getSyncStatus } = require("../services/syncState");
 const { env } = require("../config/env");
 const { VALID_STATUSES, EMAIL_TYPES } = require("../config/constants");
 
 const jobRoutes = express.Router();
+
+function getAuthenticatedUserId(req) {
+  return req.authUser?.id || null;
+}
 
 function isValidDateInput(value) {
   if (value === null || value === undefined || value === "") {
@@ -75,7 +81,8 @@ async function sendWebhook(url, payload) {
 
 jobRoutes.get("/", async (req, res) => {
   try {
-    const jobs = await getJobs();
+    const userId = getAuthenticatedUserId(req);
+    const jobs = await getJobs({ userId });
     const lastChecked = await getLastChecked();
     res.json({ jobs, lastChecked });
   } catch (error) {
@@ -83,33 +90,40 @@ jobRoutes.get("/", async (req, res) => {
   }
 });
 
+jobRoutes.get("/sync-status", (req, res) => {
+  res.json(getSyncStatus());
+});
+
 jobRoutes.post("/sync", async (req, res) => {
+  const userId = getAuthenticatedUserId(req);
   const tokens = await getTokens();
   if (!tokens) {
     return res.status(401).json({ error: "Not connected" });
   }
 
-  const mode = String(req.query.mode || "").toLowerCase() === "initial" ? "initial" : "daily";
-
-  try {
-    await fetchJobEmails({ mode });
-    const jobs = await getJobs();
-    const lastChecked = await getLastChecked();
-    return res.json({ jobs, lastChecked });
-  } catch (error) {
-    return res.status(500).json({ error: "Sync failed", details: error.message });
+  const status = getSyncStatus();
+  if (status.isSyncing) {
+    return res.status(409).json({ error: "Sync already in progress", isSyncing: true });
   }
+
+  // Run in background — respond immediately so UI isn't blocked
+  fetchJobEmails({ mode: "daily", userId }).catch((err) =>
+    console.error("[sync] background error:", err.message)
+  );
+
+  return res.json({ started: true, isSyncing: true });
 });
 
 jobRoutes.post("/backfill-emails", async (req, res) => {
+  const userId = getAuthenticatedUserId(req);
   const tokens = await getTokens();
   if (!tokens) {
     return res.status(401).json({ error: "Not connected" });
   }
 
   try {
-    const result = await backfillJobEmailsFromExistingJobs();
-    const jobs = await getJobs();
+    const result = await backfillJobEmailsFromExistingJobs({ userId });
+    const jobs = await getJobs({ userId });
     const lastChecked = await getLastChecked();
     return res.json({ ...result, jobs, lastChecked });
   } catch (error) {
@@ -134,6 +148,7 @@ jobRoutes.post("/", async (req, res) => {
   }
 
   try {
+    const userId = getAuthenticatedUserId(req);
     const newJob = {
       id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       company,
@@ -150,7 +165,7 @@ jobRoutes.post("/", async (req, res) => {
       createdAt: new Date().toISOString(),
     };
 
-    await addJob(newJob);
+    await addJob(newJob, { userId });
     res.status(201).json({ job: newJob });
   } catch (error) {
     res.status(500).json({ error: "Unable to create job", details: error.message });
@@ -159,7 +174,8 @@ jobRoutes.post("/", async (req, res) => {
 
 jobRoutes.get("/analytics/weekly", async (req, res) => {
   try {
-    const jobs = await getJobs();
+    const userId = getAuthenticatedUserId(req);
+    const jobs = await getJobs({ userId });
     const now = new Date();
     const weekAgo = new Date(now);
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -219,7 +235,8 @@ jobRoutes.get("/analytics/weekly", async (req, res) => {
 
 jobRoutes.get("/export/csv", async (req, res) => {
   try {
-    const jobs = await getJobs();
+    const userId = getAuthenticatedUserId(req);
+    const jobs = await getJobs({ userId });
     const reminders = Array.isArray(req.body?.reminders) ? req.body.reminders : [];
     const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
     const outreach = Array.isArray(req.body?.outreach) ? req.body.outreach : [];
@@ -294,13 +311,14 @@ jobRoutes.get("/export/csv", async (req, res) => {
 
 jobRoutes.get("/timeline/:id", async (req, res) => {
   try {
-    const jobs = await getJobs();
+    const userId = getAuthenticatedUserId(req);
+    const jobs = await getJobs({ userId });
     const job = jobs.find((item) => item.id === req.params.id);
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    const timeline = await getJobStatusTimeline(req.params.id);
+    const timeline = await getJobStatusTimeline(req.params.id, { userId });
     return res.json({ timeline });
   } catch (error) {
     return res.status(500).json({ error: "Unable to load timeline", details: error.message });
@@ -353,7 +371,15 @@ jobRoutes.patch("/:id", async (req, res) => {
   }
 
   try {
-    await updateJob(req.params.id, patch);
+    const userId = getAuthenticatedUserId(req);
+    if (patch.status !== undefined) {
+      const jobs = await getJobs({ userId });
+      const existing = jobs.find((j) => j.id === req.params.id);
+      if (existing && existing.status !== patch.status) {
+        await addStatusChange(req.params.id, existing.status || null, patch.status, "manual", { userId });
+      }
+    }
+    await updateJob(req.params.id, patch, { userId });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to update job", details: error.message });
@@ -362,7 +388,8 @@ jobRoutes.patch("/:id", async (req, res) => {
 
 jobRoutes.delete("/:id", async (req, res) => {
   try {
-    await deleteJob(req.params.id);
+    const userId = getAuthenticatedUserId(req);
+    await deleteJob(req.params.id, { userId });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to delete job", details: error.message });
@@ -371,7 +398,8 @@ jobRoutes.delete("/:id", async (req, res) => {
 
 jobRoutes.post("/:id/imported", async (req, res) => {
   try {
-    await markJobImported(req.params.id);
+    const userId = getAuthenticatedUserId(req);
+    await markJobImported(req.params.id, { userId });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to mark imported", details: error.message });
@@ -380,7 +408,8 @@ jobRoutes.post("/:id/imported", async (req, res) => {
 
 jobRoutes.get("/:id/emails", async (req, res) => {
   try {
-    const emails = await getJobEmails(req.params.id);
+    const userId = getAuthenticatedUserId(req);
+    const emails = await getJobEmails(req.params.id, { userId });
     if (emails === null) {
       return res.status(404).json({ error: "Job not found" });
     }
@@ -428,6 +457,7 @@ jobRoutes.post("/:id/emails", async (req, res) => {
   }
 
   try {
+    const userId = getAuthenticatedUserId(req);
     const email = {
       id: body.id || `email_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       from: body.from || "",
@@ -442,7 +472,7 @@ jobRoutes.post("/:id/emails", async (req, res) => {
       isRead: Boolean(body.isRead),
     };
 
-    const emails = await addJobEmail(req.params.id, email);
+    const emails = await addJobEmail(req.params.id, email, { userId });
     if (emails === null) {
       return res.status(404).json({ error: "Job not found" });
     }
