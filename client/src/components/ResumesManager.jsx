@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { uploadResume } from "../api/backend";
+import { uploadResume, deleteResume, getResumeViewUrl, getResumeDownloadUrl } from "../api/backend";
 
-export function ResumesManager() {
+export function ResumesManager({ resumes = [], jobs = [], onRefresh }) {
   const [file, setFile] = useState(null);
   const [name, setName] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -45,6 +45,9 @@ export function ResumesManager() {
       setName("");
       setFile(null);
       fileInputRef.current.value = "";
+      if (onRefresh) {
+        await onRefresh();
+      }
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError(err.message);
@@ -53,9 +56,36 @@ export function ResumesManager() {
     }
   };
 
+  const handleDeleteResume = async (resumeId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this resume?");
+    if (!confirmed) return;
+
+    try {
+      setError(null);
+      await deleteResume(resumeId);
+      setSuccess("Resume deleted successfully.");
+      if (onRefresh) {
+        await onRefresh();
+      }
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError(err.message || "Failed to delete resume");
+    }
+  };
+
+  const handleViewResume = (resumeId) => {
+    window.open(getResumeViewUrl(resumeId), "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownloadResume = (resumeId) => {
+    window.open(getResumeDownloadUrl(resumeId), "_blank", "noopener,noreferrer");
+  };
+
+  const jobById = new Map((jobs || []).map((job) => [String(job.id), job]));
+
   return (
-    <div style={{ maxWidth: "600px", margin: "40px auto", padding: "20px" }}>
-      <h1 style={{ marginBottom: "30px", textAlign: "center" }}>Upload Resume</h1>
+    <div style={{ width: "100%", maxWidth: "100%", margin: "0", padding: "4px" }}>
+      <h1 style={{ marginBottom: "20px" }}>Upload Resume</h1>
 
       {error && (
         <div style={{
@@ -83,7 +113,7 @@ export function ResumesManager() {
         </div>
       )}
 
-      <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <form onSubmit={handleUpload} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", alignItems: "end" }}>
         <div>
           <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "14px" }}>
             Resume Name
@@ -141,7 +171,8 @@ export function ResumesManager() {
             fontSize: "14px",
             fontWeight: "600",
             cursor: uploading || !file ? "not-allowed" : "pointer",
-            transition: "all 0.2s"
+            transition: "all 0.2s",
+            minHeight: "44px",
           }}
           onMouseEnter={(e) => {
             if (!uploading && file) {
@@ -157,6 +188,102 @@ export function ResumesManager() {
           {uploading ? "Uploading..." : "Upload Resume"}
         </button>
       </form>
+
+      <div style={{ marginTop: "30px" }}>
+        <h2 style={{ marginBottom: "12px", fontSize: "18px" }}>Uploaded Resumes ({resumes.length})</h2>
+        {resumes.length === 0 ? (
+          <p style={{ color: "#666" }}>No resumes uploaded yet.</p>
+        ) : (
+          <div style={{ border: "1px solid #e0e6f5", borderRadius: "10px", overflowX: "auto", width: "100%" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", tableLayout: "fixed" }}>
+              <thead>
+                <tr style={{ background: "#eef2ff" }}>
+                  <th style={{ textAlign: "left", padding: "12px", fontSize: "13px", width: "38%" }}>Resume</th>
+                  <th style={{ textAlign: "left", padding: "12px", fontSize: "13px", width: "18%" }}>Company</th>
+                  <th style={{ textAlign: "left", padding: "12px", fontSize: "13px", width: "18%" }}>Role</th>
+                  <th style={{ textAlign: "left", padding: "12px", fontSize: "13px", width: "14%" }}>Size</th>
+                  <th style={{ textAlign: "center", padding: "12px", fontSize: "13px", width: "12%" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumes.map((resume) => {
+                  const linkedId = String(resume.linkedJobId || resume.job_id || "");
+                  const linkedJob = jobById.get(linkedId);
+                  return (
+                    <tr key={resume.id} style={{ borderTop: "1px solid #eef1fb" }}>
+                      <td style={{ padding: "12px", color: "#1f2957", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={resume.name}>{resume.name}</td>
+                      <td style={{ padding: "12px", color: "#445", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={linkedJob?.company || "-"}>{linkedJob?.company || "-"}</td>
+                      <td style={{ padding: "12px", color: "#445", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={linkedJob?.role || "-"}>{linkedJob?.role || "-"}</td>
+                      <td style={{ padding: "12px", color: "#667", whiteSpace: "nowrap" }}>{(resume.fileSize || 0).toLocaleString()} bytes</td>
+                      <td style={{ padding: "12px", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                          <button
+                            type="button"
+                            onClick={() => handleViewResume(resume.id)}
+                            aria-label="View resume"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "8px",
+                              border: "1px solid #d9e1ff",
+                              color: "#2f4cdd",
+                              background: "#f4f7ff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span aria-hidden="true">👁</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadResume(resume.id)}
+                            aria-label="Download resume"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "8px",
+                              border: "1px solid #d9e1ff",
+                              color: "#2f4cdd",
+                              background: "#f4f7ff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span aria-hidden="true">⬇</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteResume(resume.id)}
+                            aria-label="Delete resume"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "8px",
+                              border: "1px solid #ffd5d5",
+                              color: "#c62828",
+                              background: "#fff5f5",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span aria-hidden="true">🗑</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

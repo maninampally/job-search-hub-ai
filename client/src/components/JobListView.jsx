@@ -1,16 +1,65 @@
-import React, { useState } from 'react';
-import { updateJob, uploadResume } from '../api/backend';
+import React, { useEffect, useState } from 'react';
+import { uploadResume, updateJob, getResumeViewUrl, getResumeDownloadUrl } from '../api/backend';
+import EmailLogTab from './EmailLogTab';
+import TimelineTab from './TimelineTab';
 import './jobListView.css';
 
-export default function JobListView({ jobs, resumes, onJobUpdate }) {
+const EMAIL_TYPE_CLASS = {
+  "Application Confirmation": "email-type-application",
+  "Recruiter Outreach": "email-type-recruiter",
+  "Interview Scheduled": "email-type-interview",
+  Rejection: "email-type-rejection",
+  Offer: "email-type-offer",
+  "Auto / Tracking": "email-type-auto",
+};
+
+function formatEmailDate(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+  return date.toLocaleString();
+}
+
+function getEmailTypeClass(type) {
+  return EMAIL_TYPE_CLASS[type] || "email-type-auto";
+}
+
+export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [activeJobTab, setActiveJobTab] = useState({});
   const [uploading, setUploading] = useState({});
   const [error, setError] = useState('');
+  const [activeMenuJobId, setActiveMenuJobId] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, openUp: false });
+  const [previewResume, setPreviewResume] = useState(null);
+  const [editingJobId, setEditingJobId] = useState(null);
+  const [inlineEditForm, setInlineEditForm] = useState({
+    company: '',
+    role: '',
+    status: 'Applied',
+    appliedDate: '',
+    location: '',
+    notes: '',
+  });
 
-  // Sort jobs: new to old (by applied date)
+  useEffect(() => {
+    const closeMenu = () => setActiveMenuJobId(null);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, []);
+
+  useEffect(() => {
+    const closeMenu = () => setActiveMenuJobId(null);
+    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    return () => {
+      window.removeEventListener('resize', closeMenu);
+      window.removeEventListener('scroll', closeMenu, true);
+    };
+  }, []);
+
   const sortedJobs = [...(jobs || [])].sort((a, b) => {
-    const dateA = new Date(a.applied || 0);
-    const dateB = new Date(b.applied || 0);
+    const dateA = new Date(a.appliedDate || a.applied || 0);
+    const dateB = new Date(b.appliedDate || b.applied || 0);
     return dateB - dateA;
   });
 
@@ -31,49 +80,129 @@ export default function JobListView({ jobs, resumes, onJobUpdate }) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB');
       return;
     }
 
-    // Validate file type
     const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!validTypes.includes(file.type)) {
       setError('Only PDF and DOCX files allowed');
       return;
     }
 
-    setUploading(prev => ({ ...prev, [jobId]: true }));
+    setUploading((prev) => ({ ...prev, [jobId]: true }));
     setError('');
 
     try {
       await uploadResume(file, file.name, jobId);
-      // Refresh job data
       if (onJobUpdate) {
-        onJobUpdate();
+        await onJobUpdate();
       }
     } catch (err) {
       setError(err.message || 'Upload failed');
     } finally {
-      setUploading(prev => ({ ...prev, [jobId]: false }));
+      setUploading((prev) => ({ ...prev, [jobId]: false }));
     }
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      'Wishlist': '#7c5a9d',
-      'Applied': '#4a90e2',
-      'Screening': '#f5a623',
-      'Interview': '#9013fe',
-      'Offer': '#27ae60',
-      'Rejected': '#e74c3c'
+      Wishlist: '#7c5a9d',
+      Applied: '#4a90e2',
+      Screening: '#f5a623',
+      Interview: '#9013fe',
+      Offer: '#27ae60',
+      Rejected: '#e74c3c',
     };
     return colors[status] || '#95a5a6';
   };
 
   const getAttachedResume = (jobId) => {
-    return resumes?.find(r => r.linkedJobId === jobId);
+    const targetId = String(jobId || '');
+    return resumes?.find((r) => String(r?.linkedJobId ?? r?.job_id ?? r?.jobId ?? '') === targetId);
+  };
+
+  const openMenu = (jobId, event) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 180;
+    const estimatedMenuHeight = 110;
+    const openUp = rect.bottom + estimatedMenuHeight > window.innerHeight - 8;
+    const left = Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const top = openUp ? Math.max(8, rect.top - estimatedMenuHeight - 8) : rect.bottom + 8;
+    setMenuPosition({ top, left, openUp });
+    setActiveMenuJobId((current) => (current === jobId ? null : jobId));
+  };
+
+  const openResumePreview = (resume, event) => {
+    event.stopPropagation();
+    setPreviewResume(resume);
+  };
+
+  const closeResumePreview = () => {
+    setPreviewResume(null);
+  };
+
+  const handleDelete = async (jobId, event) => {
+    event.stopPropagation();
+    setActiveMenuJobId(null);
+    const isConfirmed = window.confirm('Are you sure you want to delete this job?');
+    if (!isConfirmed) return;
+    if (onDeleteJob) {
+      await onDeleteJob(jobId);
+    }
+  };
+
+  const handleEdit = (job, event) => {
+    event.stopPropagation();
+    setActiveMenuJobId(null);
+    setExpandedId(job.id);
+    setEditingJobId(job.id);
+    setInlineEditForm({
+      company: job.company || '',
+      role: job.role || '',
+      status: job.status || 'Applied',
+      appliedDate: (job.appliedDate || job.applied || '').toString().slice(0, 10),
+      location: job.location || '',
+      notes: job.notes || '',
+    });
+  };
+
+  const handleInlineInput = (field, value) => {
+    setInlineEditForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingJobId(null);
+  };
+
+  const saveInlineEdit = async (jobId, event) => {
+    event.preventDefault();
+    setError('');
+    if (!inlineEditForm.company.trim() || !inlineEditForm.role.trim()) {
+      setError('Company and role are required.');
+      return;
+    }
+
+    const payload = {
+      company: inlineEditForm.company.trim(),
+      role: inlineEditForm.role.trim(),
+      status: inlineEditForm.status,
+      appliedDate: inlineEditForm.appliedDate || null,
+      location: inlineEditForm.location.trim(),
+      notes: inlineEditForm.notes.trim(),
+    };
+
+    try {
+      await updateJob(jobId, payload);
+      if (onJobUpdate) {
+        await onJobUpdate();
+      }
+      setEditingJobId(null);
+    } catch (err) {
+      setError(err.message || 'Unable to update job');
+    }
   };
 
   return (
@@ -95,121 +224,204 @@ export default function JobListView({ jobs, resumes, onJobUpdate }) {
               <th className="col-status">Status</th>
               <th className="col-emails">Emails</th>
               <th className="col-upload">Document</th>
+              <th className="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {sortedJobs.map(job => {
+            {sortedJobs.map((job) => {
               const isExpanded = expandedId === job.id;
               const attachedResume = getAttachedResume(job.id);
 
               return (
                 <React.Fragment key={job.id}>
-                  <tr 
-                    className={`job-row ${isExpanded ? 'expanded' : ''}`}
-                    onClick={() => handleExpandToggle(job.id)}
-                  >
+                  <tr className={`job-row ${isExpanded ? 'expanded' : ''}`} onClick={() => handleExpandToggle(job.id)}>
                     <td className="col-expand">
-                      <span className={`expand-icon ${isExpanded ? 'open' : ''}`}>›</span>
+                      <span className={`expand-icon ${isExpanded ? 'open' : ''}`}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
                     </td>
                     <td className="col-company">
                       <strong>{job.company || 'Unknown'}</strong>
                     </td>
-                    <td className="col-role">
-                      {job.role || 'Unknown Role'}
-                    </td>
+                    <td className="col-role">{job.role || 'Unknown Role'}</td>
                     <td className="col-date">
-                      {job.applied ? new Date(job.applied).toLocaleDateString() : 'N/A'}
+                      {job.appliedDate || job.applied ? new Date(job.appliedDate || job.applied).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="col-status">
-                      <span 
-                        className="status-badge"
-                        style={{ backgroundColor: getStatusColor(job.status) }}
-                      >
+                      <span className="status-badge" style={{ backgroundColor: getStatusColor(job.status) }}>
                         {job.status}
                       </span>
                     </td>
                     <td className="col-emails">
                       <span className="email-count">{job.emails?.length || 0}</span>
                     </td>
-                    <td 
-                      className="col-upload"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        className="upload-btn"
-                        onClick={(e) => handleUploadClick(job.id, e)}
-                        disabled={uploading[job.id]}
-                        title={attachedResume ? `📎 ${attachedResume.name}` : 'Upload resume'}
-                      >
-                        {uploading[job.id] ? (
-                          '⏳'
-                        ) : attachedResume ? (
-                          '📎'
+                    <td className="col-upload" onClick={(e) => e.stopPropagation()}>
+                      <div className="document-cell">
+                        {attachedResume ? (
+                          <button className="doc-icon-btn" onClick={(e) => openResumePreview(attachedResume, e)} title={`View resume: ${attachedResume.name}`}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                              <path d="M1.5 12C3.6 7.8 7.4 5.5 12 5.5C16.6 5.5 20.4 7.8 22.5 12C20.4 16.2 16.6 18.5 12 18.5C7.4 18.5 3.6 16.2 1.5 12Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                            </svg>
+                          </button>
                         ) : (
-                          '📤'
+                          <button className="doc-icon-btn" onClick={(e) => handleUploadClick(job.id, e)} disabled={uploading[job.id]} title="Upload resume">
+                            {uploading[job.id] ? (
+                              '...'
+                            ) : (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M12 16V5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                <path d="M8 9L12 5L16 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M4 19H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            )}
+                          </button>
                         )}
-                      </button>
+                        <div className="document-text">
+                          {attachedResume ? null : (
+                            <span className="file-state-text file-state-empty">No file</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="col-actions" onClick={(e) => e.stopPropagation()}>
+                      <div className="actions-wrap">
+                        <button
+                          type="button"
+                          className="actions-trigger"
+                          onClick={(e) => openMenu(job.id, e)}
+                          aria-label="Open job actions"
+                          title="More actions"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+                            <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                            <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
 
                   {isExpanded && (
                     <tr className="job-details-row">
-                      <td colSpan="7">
+                      <td colSpan="8">
                         <div className="job-details">
-                          <div className="details-grid">
-                            <div className="detail-item">
-                              <label>Location:</label>
-                              <p>{job.location || 'Not specified'}</p>
-                            </div>
-                            <div className="detail-item">
-                              <label>Source:</label>
-                              <p>{job.source || 'Unknown'}</p>
-                            </div>
-                            <div className="detail-item">
-                              <label>Status:</label>
-                              <p>{job.status}</p>
-                            </div>
-                            <div className="detail-item">
-                              <label>Applied Date:</label>
-                              <p>{job.applied ? new Date(job.applied).toLocaleDateString() : 'N/A'}</p>
-                            </div>
+                          <div className="tabs-header">
+                            {['Summary', 'Email Log', 'Timeline'].map((tab) => (
+                              <button
+                                key={tab}
+                                type="button"
+                                className={`tab-button ${(activeJobTab[job.id] || 'Summary') === tab ? 'active' : ''}`}
+                                onClick={() => setActiveJobTab((prev) => ({ ...prev, [job.id]: tab }))}
+                              >
+                                {tab}
+                              </button>
+                            ))}
                           </div>
 
-                          {job.description && (
-                            <div className="detail-item full-width">
-                              <label>Description:</label>
-                              <p>{job.description}</p>
-                            </div>
-                          )}
-
-                          {job.notes && (
-                            <div className="detail-item full-width">
-                              <label>Notes:</label>
-                              <p>{job.notes}</p>
-                            </div>
-                          )}
-
-                          {attachedResume && (
-                            <div className="detail-item full-width">
-                              <label>Attached Resume:</label>
-                              <div className="resume-info">
-                                <span>📄 {attachedResume.name}</span>
-                                <small>({attachedResume.fileSize} bytes)</small>
+                          {(activeJobTab[job.id] || 'Summary') === 'Summary' && (
+                            <>
+                              <div className="details-grid">
+                                <div className="detail-item">
+                                  <label>Location:</label>
+                                  <p>{job.location || 'Not specified'}</p>
+                                </div>
+                                <div className="detail-item">
+                                  <label>Source:</label>
+                                  <p>{job.source || 'Unknown'}</p>
+                                </div>
+                                <div className="detail-item">
+                                  <label>Status:</label>
+                                  <p>{job.status}</p>
+                                </div>
+                                <div className="detail-item">
+                                  <label>Applied Date:</label>
+                                  <p>{job.appliedDate || job.applied ? new Date(job.appliedDate || job.applied).toLocaleDateString() : 'N/A'}</p>
+                                </div>
                               </div>
-                            </div>
+
+                              {job.notes && (
+                                <div className="detail-item full-width">
+                                  <label>Notes:</label>
+                                  <p>{job.notes}</p>
+                                </div>
+                              )}
+
+                              {attachedResume && (
+                                <div className="detail-item full-width">
+                                  <label>Attached Resume:</label>
+                                  <div className="resume-info">
+                                    <span>Resume: {attachedResume.name}</span>
+                                    <small>({attachedResume.fileSize} bytes)</small>
+                                    <button type="button" className="btn btn-small" onClick={(e) => openResumePreview(attachedResume, e)}>
+                                      Preview
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="detail-actions">
+                                <button className="btn btn-small btn-primary" onClick={(e) => handleUploadClick(job.id, e)}>
+                                  {attachedResume ? 'Change Resume' : 'Upload Resume'}
+                                </button>
+                                {attachedResume && (
+                                  <a
+                                    href={getResumeDownloadUrl(attachedResume.id)}
+                                    className="btn btn-small"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Download Resume
+                                  </a>
+                                )}
+                              </div>
+                            </>
                           )}
 
-                          <div className="detail-actions">
-                            <button 
-                              className="btn btn-small btn-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUploadClick(job.id, e);
-                              }}
-                            >
-                              {attachedResume ? 'Change Resume' : 'Upload Resume'}
-                            </button>
-                          </div>
+                          {activeJobTab[job.id] === 'Email Log' && (
+                            <EmailLogTab
+                              jobId={job.id}
+                              formatEmailDate={formatEmailDate}
+                              getEmailTypeClass={getEmailTypeClass}
+                            />
+                          )}
+
+                          {activeJobTab[job.id] === 'Timeline' && (
+                            <TimelineTab jobId={job.id} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {editingJobId === job.id && (
+                    <tr className="job-inline-edit-row">
+                      <td colSpan="8">
+                        <div className="job-inline-edit-panel">
+                          <label>Edit Job Inline</label>
+                          <form className="inline-edit-form" onSubmit={(e) => saveInlineEdit(job.id, e)}>
+                            <input value={inlineEditForm.company} onChange={(e) => handleInlineInput('company', e.target.value)} placeholder="Company *" />
+                            <input value={inlineEditForm.role} onChange={(e) => handleInlineInput('role', e.target.value)} placeholder="Role *" />
+                            <select value={inlineEditForm.status} onChange={(e) => handleInlineInput('status', e.target.value)}>
+                              <option value="Wishlist">Wishlist</option>
+                              <option value="Applied">Applied</option>
+                              <option value="Screening">Screening</option>
+                              <option value="Interview">Interview</option>
+                              <option value="Offer">Offer</option>
+                              <option value="Rejected">Rejected</option>
+                            </select>
+                            <input type="date" value={inlineEditForm.appliedDate} onChange={(e) => handleInlineInput('appliedDate', e.target.value)} />
+                            <input value={inlineEditForm.location} onChange={(e) => handleInlineInput('location', e.target.value)} placeholder="Location" />
+                            <input value={inlineEditForm.notes} onChange={(e) => handleInlineInput('notes', e.target.value)} placeholder="Notes" />
+                            <div className="inline-edit-actions">
+                              <button type="submit" className="btn btn-small btn-primary">Save</button>
+                              <button type="button" className="btn btn-small" onClick={cancelInlineEdit}>Cancel</button>
+                            </div>
+                          </form>
                         </div>
                       </td>
                     </tr>
@@ -226,6 +438,53 @@ export default function JobListView({ jobs, resumes, onJobUpdate }) {
           </div>
         )}
       </div>
+
+      {activeMenuJobId && (
+        <div
+          className={`actions-menu actions-menu-floating ${menuPosition.openUp ? 'menu-up' : 'menu-down'}`}
+          style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const job = (sortedJobs || []).find((item) => item.id === activeMenuJobId);
+            if (!job) return null;
+            return (
+              <>
+                <button type="button" onClick={(e) => handleEdit(job, e)}>Edit Job</button>
+                <button type="button" className="danger-item" onClick={(e) => handleDelete(job.id, e)}>
+                  Delete Job
+                </button>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {previewResume && (
+        <div className="resume-preview-overlay" onClick={closeResumePreview}>
+          <div className="resume-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="resume-preview-header">
+              <h3>{previewResume.name}</h3>
+              <button type="button" onClick={closeResumePreview} aria-label="Close preview">x</button>
+            </div>
+            <div className="resume-preview-body">
+              {previewResume.mimeType === 'application/pdf' ? (
+                <iframe
+                  title="Resume preview"
+                  src={`${getResumeViewUrl(previewResume.id)}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                />
+              ) : (
+                <div className="resume-preview-fallback">
+                  <p>DOCX preview is not supported in-browser here.</p>
+                  <a href={getResumeDownloadUrl(previewResume.id)} target="_blank" rel="noreferrer">
+                    Open or download file
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
