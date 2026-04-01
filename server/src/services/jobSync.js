@@ -1,8 +1,11 @@
 const {
   addJobEmail,
+  saveJobEmail,
+  addStatusChange,
   addJob,
   getJobs,
   getLastChecked,
+  getLinkedUserId,
   getTokens,
   isProcessedEmail,
   markProcessedEmail,
@@ -13,6 +16,7 @@ const {
 const { oauth2Client, createGmailClient } = require("../integrations/gmail");
 const { extractJobInfo } = require("./jobExtractor");
 const { withRetry, withTimeout } = require("../utils/asyncTools");
+const { acquireSyncLock, releaseSyncLock } = require("./syncState");
 const { env } = require("../config/env");
 
 const GMAIL_QUERY_BASE =
@@ -20,7 +24,7 @@ const GMAIL_QUERY_BASE =
 
 const STATUS_PROGRESSION = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"];
 
-async function refreshTokensIfExpired(tokens) {
+async function refreshTokensIfExpired(tokens, userId) {
   if (!tokens || !tokens.expiry_date || tokens.expiry_date >= Date.now()) {
     return tokens;
   }
@@ -30,7 +34,7 @@ async function refreshTokensIfExpired(tokens) {
     ...tokens,
     ...credentials,
   };
-  await setTokens(nextTokens);
+  await setTokens(nextTokens, { userId });
   console.log("[sync] refreshed Gmail OAuth token");
   return nextTokens;
 }
@@ -236,7 +240,8 @@ function sameCompanyRole(firstJob, secondJob) {
   return firstCompany === secondCompany && firstRole === secondRole;
 }
 
-async function updateJobStatus(existingJob, newExtracted, emailPayload) {
+async function updateJobStatus(existingJob, newExtracted, emailPayload, options = {}) {
+  const userId = options.userId || null;
   const currentStatus = normalizeStatus(existingJob.status);
   const incomingStatus = normalizeStatus(newExtracted.status);
   const nextStatus = shouldPromoteStatus(currentStatus, incomingStatus)
@@ -255,8 +260,12 @@ async function updateJobStatus(existingJob, newExtracted, emailPayload) {
     nextStep: newExtracted.nextStep || existingJob.nextStep || null,
   };
 
-  await updateJob(existingJob.id, patch);
-  await addJobEmail(existingJob.id, emailPayload);
+  if (patch.status !== existingJob.status) {
+    await addStatusChange(existingJob.id, existingJob.status || null, patch.status, "email_sync", { userId });
+  }
+  await updateJob(existingJob.id, patch, { userId });
+  await addJobEmail(existingJob.id, emailPayload, { userId });
+  await saveJobEmail(existingJob.id, { ...emailPayload, ownerUserId: userId });
 }
 
 function decodeGmailBodyData(data) {
@@ -374,7 +383,8 @@ function buildSyncQuery(lastChecked, forceInitialSync = false) {
   return `${GMAIL_QUERY_BASE} newer_than:${env.DAILY_SYNC_LOOKBACK_DAYS}d`;
 }
 
-async function processEmail(gmail, messageId) {
+async function processEmail(gmail, messageId, options = {}) {
+  const userId = options.userId || null;
   const { subject, from, date, body } = await fetchMessageDetails(gmail, messageId);
   const { fromName, fromEmail } = parseSender(from);
   const originalBody = String(body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
@@ -427,16 +437,17 @@ async function processEmail(gmail, messageId) {
     isRead: false,
   };
 
-  const jobs = await getJobs();
+  const jobs = await getJobs({ userId });
   const matchedJob = jobs.find((job) => sameCompanyRole(job, extracted));
 
   if (matchedJob) {
-    await updateJobStatus(matchedJob, extracted, emailPayload);
+    await updateJobStatus(matchedJob, extracted, emailPayload, { userId });
     return;
   }
 
+  const newJobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   await addJob({
-    id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: newJobId,
     ...extracted,
     emailId: messageId,
     emails: [emailPayload],
@@ -446,18 +457,20 @@ async function processEmail(gmail, messageId) {
       extracted.status !== "Applied"
         ? (extracted.notes || "Applied status inferred from a later status email.")
         : extracted.notes,
-  });
+  }, { userId });
+  await saveJobEmail(newJobId, { ...emailPayload, ownerUserId: userId });
   console.log(`Added: ${extracted.company} — ${extracted.role}`);
 }
 
-async function backfillJobEmailsFromExistingJobs() {
+async function backfillJobEmailsFromExistingJobs(options = {}) {
+  const userId = options.userId || null;
   const tokens = await getTokens();
   if (!tokens) {
     return { updated: 0, scanned: 0 };
   }
 
   const gmail = createGmailClient(tokens);
-  const jobs = await getJobs();
+  const jobs = await getJobs({ userId });
   let updated = 0;
   let scanned = 0;
 
@@ -490,7 +503,7 @@ async function backfillJobEmailsFromExistingJobs() {
         isReal,
         gmailId: job.emailId,
         isRead: false,
-      });
+      }, { userId });
 
       if (Array.isArray(emails) && emails.length > 0) {
         updated += 1;
@@ -503,7 +516,8 @@ async function backfillJobEmailsFromExistingJobs() {
   return { updated, scanned };
 }
 
-async function processMessagesWithQueue(gmail, messages) {
+async function processMessagesWithQueue(gmail, messages, options = {}) {
+  const userId = options.userId || null;
   const concurrency = Math.max(1, Number(env.SYNC_PROCESSING_CONCURRENCY || 1));
   const queue = [...messages];
   let processed = 0;
@@ -516,14 +530,14 @@ async function processMessagesWithQueue(gmail, messages) {
       }
 
       try {
-        await processEmail(gmail, msg.id);
-        await markProcessedEmail(msg.id);
+        await processEmail(gmail, msg.id, { userId });
+        await markProcessedEmail(msg.id, { userId });
         processed += 1;
       } catch (error) {
         console.error(`[sync] message processing failed: gmailId=${msg.id}`, error.message);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise((resolve) => setTimeout(resolve, 1200));
     }
   }
 
@@ -533,82 +547,99 @@ async function processMessagesWithQueue(gmail, messages) {
 }
 
 async function fetchJobEmails(options = {}) {
+  if (!acquireSyncLock()) {
+    console.log("[sync] skipped: sync already in progress");
+    return;
+  }
+
+  const userId = options.userId || null;
   const forceInitialSync = options.mode === "initial";
-  const storedTokens = await getTokens();
-  if (!storedTokens) {
-    console.log("[sync] skipped: gmail not connected");
-    return;
-  }
-
-  let activeTokens = storedTokens;
-  try {
-    activeTokens = await refreshTokensIfExpired(storedTokens);
-  } catch (error) {
-    console.error("[sync] token refresh failed:", error.message);
-    return;
-  }
-
-  const gmail = createGmailClient(activeTokens);
-  const startedAt = Date.now();
-  const previousLastChecked = await getLastChecked();
-  const query = buildSyncQuery(previousLastChecked, forceInitialSync);
 
   try {
-    const messages = [];
-    let pageToken;
-    let continuePaging = true;
+    const storedTokens = await getTokens();
+    if (!storedTokens) {
+      console.log("[sync] skipped: gmail not connected");
+      releaseSyncLock();
+      return;
+    }
 
-    while (continuePaging) {
-      const list = await withRetry(
-        () =>
-          withTimeout(
-            () =>
-              gmail.users.messages.list({
-                userId: "me",
-                q: query,
-                maxResults: env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE,
-                pageToken,
-              }),
-            env.EXTERNAL_API_TIMEOUT_MS,
-            "Gmail message list timed out"
-          ),
-        { retries: env.RETRY_ATTEMPTS }
+    let activeTokens = storedTokens;
+    try {
+      activeTokens = await refreshTokensIfExpired(storedTokens, userId);
+    } catch (error) {
+      console.error("[sync] token refresh failed:", error.message);
+      releaseSyncLock();
+      return;
+    }
+
+    const gmail = createGmailClient(activeTokens);
+    const startedAt = Date.now();
+    const previousLastChecked = await getLastChecked();
+    const query = buildSyncQuery(previousLastChecked, forceInitialSync);
+
+    try {
+      const messages = [];
+      let pageToken;
+      let continuePaging = true;
+
+      while (continuePaging) {
+        const list = await withRetry(
+          () =>
+            withTimeout(
+              () =>
+                gmail.users.messages.list({
+                  userId: "me",
+                  q: query,
+                  maxResults: env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE,
+                  pageToken,
+                }),
+              env.EXTERNAL_API_TIMEOUT_MS,
+              "Gmail message list timed out"
+            ),
+          { retries: env.RETRY_ATTEMPTS }
+        );
+
+        const pageMessages = list.data.messages || [];
+        messages.push(...pageMessages);
+        pageToken = list.data.nextPageToken;
+
+        if ((!previousLastChecked || forceInitialSync) && messages.length >= env.INITIAL_SYNC_MAX_MESSAGES) {
+          continuePaging = false;
+        } else if (!forceInitialSync && previousLastChecked && messages.length >= env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE) {
+          continuePaging = false;
+        } else if (!pageToken) {
+          continuePaging = false;
+        }
+      }
+
+      const limitedMessages = (!previousLastChecked || forceInitialSync)
+        ? messages.slice(0, env.INITIAL_SYNC_MAX_MESSAGES)
+        : messages;
+      const newMessages = [];
+      for (const message of limitedMessages) {
+        const processed = await isProcessedEmail(message.id, { userId });
+        if (!processed) {
+          newMessages.push(message);
+        }
+      }
+
+      const processedCount = await processMessagesWithQueue(gmail, newMessages, { userId });
+
+      const checkedAt = new Date().toISOString();
+      await setLastChecked(checkedAt);
+
+      const result = { scanned: limitedMessages.length, processed: processedCount };
+      console.log(
+        `[sync] completed: scanned=${result.scanned}, processed=${result.processed}, queued=${newMessages.length}, query="${query}", durationMs=${Date.now() - startedAt}`
       );
-
-      const pageMessages = list.data.messages || [];
-      messages.push(...pageMessages);
-      pageToken = list.data.nextPageToken;
-
-      if ((!previousLastChecked || forceInitialSync) && messages.length >= env.INITIAL_SYNC_MAX_MESSAGES) {
-        continuePaging = false;
-      } else if (!forceInitialSync && previousLastChecked && messages.length >= env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE) {
-        continuePaging = false;
-      } else if (!pageToken) {
-        continuePaging = false;
-      }
+      releaseSyncLock(result);
+    } catch (error) {
+      console.error("[sync] failed:", error.message);
+      releaseSyncLock();
     }
-
-    const limitedMessages = (!previousLastChecked || forceInitialSync)
-      ? messages.slice(0, env.INITIAL_SYNC_MAX_MESSAGES)
-      : messages;
-    const newMessages = [];
-    for (const message of limitedMessages) {
-      const processed = await isProcessedEmail(message.id);
-      if (!processed) {
-        newMessages.push(message);
-      }
-    }
-
-    const processedCount = await processMessagesWithQueue(gmail, newMessages);
-
-    const checkedAt = new Date().toISOString();
-    await setLastChecked(checkedAt);
-
-    console.log(
-      `[sync] completed: scanned=${limitedMessages.length}, processed=${processedCount}, queued=${newMessages.length}, query="${query}", durationMs=${Date.now() - startedAt}`
-    );
   } catch (error) {
-    console.error("[sync] failed:", error.message);
+    console.error("[sync] unexpected error:", error.message);
+    releaseSyncLock();
   }
 }
 

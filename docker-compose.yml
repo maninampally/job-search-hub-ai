@@ -20,11 +20,14 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       EXTERNAL_API_TIMEOUT_MS: ${EXTERNAL_API_TIMEOUT_MS:-12000}
       RETRY_ATTEMPTS: ${RETRY_ATTEMPTS:-2}
-      INITIAL_SYNC_LOOKBACK_DAYS: ${INITIAL_SYNC_LOOKBACK_DAYS:-180}
+      INITIAL_SYNC_LOOKBACK_DAYS: ${INITIAL_SYNC_LOOKBACK_DAYS:-1}
       DAILY_SYNC_LOOKBACK_DAYS: ${DAILY_SYNC_LOOKBACK_DAYS:-1}
       GMAIL_SYNC_MAX_RESULTS_PER_PAGE: ${GMAIL_SYNC_MAX_RESULTS_PER_PAGE:-100}
       INITIAL_SYNC_MAX_MESSAGES: ${INITIAL_SYNC_MAX_MESSAGES:-1000}
       SYNC_CRON: ${SYNC_CRON:-0 9 * * *}
+      SYNC_PROCESSING_CONCURRENCY: ${SYNC_PROCESSING_CONCURRENCY:-1}
+    volumes:
+      - server_data:/app/server/data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health >/dev/null || exit 1"]
       interval: 15s
@@ -49,3 +52,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+volumes:
+  server_data:
