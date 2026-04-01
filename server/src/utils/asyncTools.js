@@ -36,8 +36,15 @@ async function withRetry(taskFactory, options = {}) {
       if (attempt === retries) {
         break;
       }
-      await sleep(delay);
-      delay = Math.min(maxDelayMs, delay * backoffMultiplier);
+      // Claude / OpenAI rate limit — respect retry-after header, default 65s
+      const isRateLimit = error.status === 429 || error.statusCode === 429;
+      if (isRateLimit) {
+        const retryAfterSec = parseInt(error.headers?.["retry-after"] || "65", 10);
+        await sleep(retryAfterSec * 1000);
+      } else {
+        await sleep(delay);
+        delay = Math.min(maxDelayMs, delay * backoffMultiplier);
+      }
     }
     attempt += 1;
   }

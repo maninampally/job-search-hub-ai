@@ -13,12 +13,12 @@ const env = {
     .filter(Boolean),
   EXTERNAL_API_TIMEOUT_MS: Number(process.env.EXTERNAL_API_TIMEOUT_MS || 12000),
   RETRY_ATTEMPTS: Number(process.env.RETRY_ATTEMPTS || 2),
-  INITIAL_SYNC_LOOKBACK_DAYS: Number(process.env.INITIAL_SYNC_LOOKBACK_DAYS || 180),
+  INITIAL_SYNC_LOOKBACK_DAYS: Number(process.env.INITIAL_SYNC_LOOKBACK_DAYS || 1),
   DAILY_SYNC_LOOKBACK_DAYS: Number(process.env.DAILY_SYNC_LOOKBACK_DAYS || 1),
   GMAIL_SYNC_MAX_RESULTS_PER_PAGE: Number(process.env.GMAIL_SYNC_MAX_RESULTS_PER_PAGE || 100),
   INITIAL_SYNC_MAX_MESSAGES: Number(process.env.INITIAL_SYNC_MAX_MESSAGES || 1000),
   SYNC_CRON: process.env.SYNC_CRON || "0 9 * * *",
-  SYNC_PROCESSING_CONCURRENCY: Number(process.env.SYNC_PROCESSING_CONCURRENCY || 3),
+  SYNC_PROCESSING_CONCURRENCY: Number(process.env.SYNC_PROCESSING_CONCURRENCY || 1),
   MCP_AUTH_TOKEN: process.env.MCP_AUTH_TOKEN || "",
   MCP_AUDIT_LOG_ENABLED: String(process.env.MCP_AUDIT_LOG_ENABLED || "true").toLowerCase() !== "false",
   MCP_ALLOWED_TOOLS: (process.env.MCP_ALLOWED_TOOLS || "")
@@ -30,6 +30,8 @@ const env = {
   NOTIFY_EMAIL_WEBHOOK_URL: process.env.NOTIFY_EMAIL_WEBHOOK_URL || "",
   NOTIFY_SLACK_WEBHOOK_URL: process.env.NOTIFY_SLACK_WEBHOOK_URL || "",
   NOTIFY_WHATSAPP_WEBHOOK_URL: process.env.NOTIFY_WHATSAPP_WEBHOOK_URL || "",
+  AUTH_TOKEN_SECRET: process.env.AUTH_TOKEN_SECRET || "dev-local-auth-secret-change-me",
+  AUTH_TOKEN_TTL_HOURS: Number(process.env.AUTH_TOKEN_TTL_HOURS || 24),
 };
 
 const requiredEnvironmentVariables = [

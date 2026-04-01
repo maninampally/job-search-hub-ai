@@ -142,7 +142,7 @@ Body: ${cleanedBody}`,
           env.EXTERNAL_API_TIMEOUT_MS,
           "Claude extraction timed out"
         ),
-      { retries: env.RETRY_ATTEMPTS }
+      { retries: Math.max(env.RETRY_ATTEMPTS, 3) }
     );
 
     const text = res.content[0]?.text || "{}";
