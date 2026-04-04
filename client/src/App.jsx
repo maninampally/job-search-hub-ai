@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import DashboardWrapper from "./pages/DashboardWrapper";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { useAuth } from "./auth/AuthContext";
 
 function ProtectedRoute({ children }) {
@@ -43,6 +44,14 @@ export default function App() {
             <PublicOnlyRoute>
               <LoginPage />
             </PublicOnlyRoute>
+          )}
+        />
+        <Route
+          path="/verify-email"
+          element={(
+            <ProtectedRoute>
+              <VerifyEmailPage />
+            </ProtectedRoute>
           )}
         />
         <Route
