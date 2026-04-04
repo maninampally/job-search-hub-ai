@@ -12,6 +12,7 @@ const { contactRoutes } = require("./routes/contactRoutes");
 const { reminderRoutes } = require("./routes/reminderRoutes");
 const { outreachRoutes } = require("./routes/outreachRoutes");
 const { mcpRoutes } = require("./routes/mcpRoutes");
+const { emailExtractionRoutes } = require("./routes/emailExtractionRoutes");
 const { requireUserAuth } = require("./middleware/requireUserAuth");
 
 function createApp() {
@@ -66,6 +67,7 @@ function createApp() {
   app.use("/reminders", requireUserAuth, reminderRoutes);
   app.use("/outreach", requireUserAuth, outreachRoutes);
   app.use("/templates", requireUserAuth, templateRoutes);
+  app.use("/api/extract", requireUserAuth, emailExtractionRoutes);
   app.use("/health", healthRoutes);
   app.use("/mcp", mcpRoutes);
 
