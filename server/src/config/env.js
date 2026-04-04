@@ -32,6 +32,8 @@ const env = {
   NOTIFY_WHATSAPP_WEBHOOK_URL: process.env.NOTIFY_WHATSAPP_WEBHOOK_URL || "",
   AUTH_TOKEN_SECRET: process.env.AUTH_TOKEN_SECRET || "dev-local-auth-secret-change-me",
   AUTH_TOKEN_TTL_HOURS: Number(process.env.AUTH_TOKEN_TTL_HOURS || 24),
+  SESSION_SECRET: process.env.SESSION_SECRET || "dev-session-secret-change-me",
+  ENVIRONMENT: process.env.NODE_ENV || "development",
 };
 
 const requiredEnvironmentVariables = [
