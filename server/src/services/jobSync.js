@@ -7,6 +7,8 @@ const {
   getLastChecked,
   getLinkedUserId,
   getTokens,
+  getTokensByUser,
+  refreshTokenIfExpiredForUser,
   isProcessedEmail,
   markProcessedEmail,
   setLastChecked,
@@ -29,14 +31,16 @@ async function refreshTokensIfExpired(tokens, userId) {
     return tokens;
   }
 
-  const { credentials } = await oauth2Client.refreshAccessToken();
-  const nextTokens = {
-    ...tokens,
-    ...credentials,
-  };
-  await setTokens(nextTokens, { userId });
-  console.log("[sync] refreshed Gmail OAuth token");
-  return nextTokens;
+  try {
+    await refreshTokenIfExpiredForUser(userId);
+    // After refresh, fetch the updated tokens
+    const updatedTokens = await getTokensByUser(userId);
+    console.log("[sync] refreshed Gmail OAuth token for user:", userId);
+    return updatedTokens;
+  } catch (error) {
+    console.error("[sync] token refresh failed:", error.message);
+    throw error;
+  }
 }
 
 function parseSender(fromHeader) {
@@ -464,8 +468,15 @@ async function processEmail(gmail, messageId, options = {}) {
 
 async function backfillJobEmailsFromExistingJobs(options = {}) {
   const userId = options.userId || null;
-  const tokens = await getTokens();
+  
+  if (!userId) {
+    console.log("[backfill] skipped: userId required");
+    return { updated: 0, scanned: 0 };
+  }
+
+  const tokens = await getTokensByUser(userId);
   if (!tokens) {
+    console.log("[backfill] skipped: gmail not connected for user:", userId);
     return { updated: 0, scanned: 0 };
   }
 
@@ -547,19 +558,29 @@ async function processMessagesWithQueue(gmail, messages, options = {}) {
 }
 
 async function fetchJobEmails(options = {}) {
-  if (!acquireSyncLock()) {
-    console.log("[sync] skipped: sync already in progress");
+  const userId = options.userId || null;
+
+  // REQUIRE userId — no extraction without per-user context
+  if (!userId) {
+    console.log("[sync] skipped: userId required for per-user extraction");
     return;
   }
 
-  const userId = options.userId || null;
+  // NEW: Use per-user lock key
+  const lockKey = `sync_${userId}`;
+  if (!acquireSyncLock(lockKey)) {
+    console.log(`[sync] skipped: sync already in progress for user=${userId}`);
+    return;
+  }
+
   const forceInitialSync = options.mode === "initial";
 
   try {
-    const storedTokens = await getTokens();
+    // NEW: Load tokens per-user (not global)
+    const storedTokens = await getTokensByUser(userId);
     if (!storedTokens) {
-      console.log("[sync] skipped: gmail not connected");
-      releaseSyncLock();
+      console.log("[sync] skipped: gmail not connected for user:", userId);
+      releaseSyncLock(lockKey);
       return;
     }
 
@@ -568,7 +589,7 @@ async function fetchJobEmails(options = {}) {
       activeTokens = await refreshTokensIfExpired(storedTokens, userId);
     } catch (error) {
       console.error("[sync] token refresh failed:", error.message);
-      releaseSyncLock();
+      releaseSyncLock(lockKey);
       return;
     }
 
@@ -630,16 +651,16 @@ async function fetchJobEmails(options = {}) {
 
       const result = { scanned: limitedMessages.length, processed: processedCount };
       console.log(
-        `[sync] completed: scanned=${result.scanned}, processed=${result.processed}, queued=${newMessages.length}, query="${query}", durationMs=${Date.now() - startedAt}`
+        `[sync] completed for user=${userId}: scanned=${result.scanned}, processed=${result.processed}, queued=${newMessages.length}, query="${query}", durationMs=${Date.now() - startedAt}`
       );
-      releaseSyncLock(result);
+      releaseSyncLock(lockKey, result);
     } catch (error) {
       console.error("[sync] failed:", error.message);
-      releaseSyncLock();
+      releaseSyncLock(lockKey);
     }
   } catch (error) {
     console.error("[sync] unexpected error:", error.message);
-    releaseSyncLock();
+    releaseSyncLock(lockKey);
   }
 }
 
