@@ -11,7 +11,7 @@ import {
   verifyEmailToken,
   getExtractionStatus,
   formatErrorMessage
-} from '../../api/emailExtraction.js';
+} from '../api/emailExtraction.js';
 
 const EmailExtractionVerification = ({ onSuccess, onCancel }) => {
   // State management
