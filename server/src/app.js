@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const session = require("express-session");
 const { env } = require("./config/env");
 
 const { authRoutes } = require("./routes/authRoutes");
@@ -40,6 +41,21 @@ function createApp() {
 
         callback(new Error("CORS blocked for origin"), false);
       },
+    })
+  );
+
+  // Session middleware for OAuth CSRF protection
+  app.use(
+    session({
+      secret: env.SESSION_SECRET || "dev-secret-change-in-production",
+      resave: false,
+      saveUninitialized: true,
+      cookie: { 
+        httpOnly: true, 
+        secure: env.ENVIRONMENT === "production",
+        sameSite: "lax",
+        maxAge: 30 * 60 * 1000 // 30 minutes
+      }
     })
   );
 
