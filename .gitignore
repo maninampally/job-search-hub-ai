@@ -1,6 +1,96 @@
+# Dependencies
 node_modules/
+package-lock.json
+
+# Environment variables
 .env
+.env.local
+
+# Logs and reports
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
 dist/
+build/
 coverage/
+.next/
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary Project Files
 server/data/
+server/uploads/
+client/build/
+
+# Temporary Documentation (for features/bugs/todos in progress)
+TODO.md
+TODO*.md
+FIXME.md
+FIXME*.md
+NOTES.md
+NOTES*.md
+TEMP*.md
+TEMP/
+
+# Feature/Bug tracking docs (temporary)
+*_FEATURE.md
+*_BUG.md
+*_TODO.md
+*_ISSUE.md
+*_WIP.md
+*_IN_PROGRESS.md
+
+# Copilot/AI Prompt files (temporary)
+*_prompt.md
+copilot_prompt.md
+*_copilot.md
+
+# Deployment/Testing checklists (temporary, regenerated per deployment)
+DEPLOYMENT_CHECKLIST.md
+DEPLOYMENT_READINESS.md
+SMOKE_REPORT.md
+*_CHECKLIST.md
+*_READINESS.md
+*_REPORT.md
+
+# Development/Progress notes (temporary)
+FRONTEND_IMPROVEMENTS.md
+BACKEND_IMPROVEMENTS.md
+*_IMPROVEMENTS.md
+PROGRESS.md
+*_PROGRESS.md
+BROKEN.md
+
+# Session/Temporary data
+session/
+.session
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+
+# Jest/Test coverage
+.nyc_output/
+*.lcov
+
+# Misc
+*.pem
+*.key
+.cache/
+.eslintcache
