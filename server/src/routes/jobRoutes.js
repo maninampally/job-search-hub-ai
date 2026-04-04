@@ -9,6 +9,7 @@ const {
   getJobs,
   getLastChecked,
   getTokens,
+  getTokensByUser,
   markJobImported,
   updateJob,
 } = require("../store/dataStore");
@@ -91,19 +92,26 @@ jobRoutes.get("/", async (req, res) => {
 });
 
 jobRoutes.get("/sync-status", (req, res) => {
-  res.json(getSyncStatus());
+  // NEW: Support both global and per-user status queries
+  const userId = getAuthenticatedUserId(req);
+  res.json(getSyncStatus(userId));
 });
 
 jobRoutes.post("/sync", async (req, res) => {
   const userId = getAuthenticatedUserId(req);
-  const tokens = await getTokens();
+  if (!userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const tokens = await getTokensByUser(userId);
   if (!tokens) {
     return res.status(401).json({ error: "Not connected" });
   }
 
-  const status = getSyncStatus();
+  // NEW: Check per-user sync status
+  const status = getSyncStatus(userId);
   if (status.isSyncing) {
-    return res.status(409).json({ error: "Sync already in progress", isSyncing: true });
+    return res.status(409).json({ error: "Sync already in progress for this user", isSyncing: true });
   }
 
   // Run in background — respond immediately so UI isn't blocked
@@ -116,7 +124,11 @@ jobRoutes.post("/sync", async (req, res) => {
 
 jobRoutes.post("/backfill-emails", async (req, res) => {
   const userId = getAuthenticatedUserId(req);
-  const tokens = await getTokens();
+  if (!userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const tokens = await getTokensByUser(userId);
   if (!tokens) {
     return res.status(401).json({ error: "Not connected" });
   }
@@ -230,6 +242,87 @@ jobRoutes.get("/analytics/weekly", async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: "Unable to build weekly analytics", details: error.message });
+  }
+});
+
+jobRoutes.get("/analytics/daily", async (req, res) => {
+  try {
+    const userId = getAuthenticatedUserId(req);
+    const metric = req.query.metric || "applications";
+
+    if (metric !== "applications") {
+      return res.status(400).json({ error: "Only 'applications' metric is currently supported" });
+    }
+
+    // Determine date range: custom or preset
+    let startDate, endDate;
+    if (req.query.startDate && req.query.endDate) {
+      // Custom date range
+      startDate = new Date(req.query.startDate);
+      endDate = new Date(req.query.endDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Preset days range
+      const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Midnight of today
+      endDate = new Date(now);
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days + 1);
+    }
+
+    const jobs = await getJobs({ userId });
+
+    // Calculate number of days in range
+    const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Build map of date -> application count
+    const dailyCounts = {};
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      const dateKey = date.toISOString().split("T")[0]; // YYYY-MM-DD
+      dailyCounts[dateKey] = 0;
+    }
+
+    // Count applications by appliedDate
+    for (const job of jobs) {
+      const appliedDate = job.appliedDate;
+      if (appliedDate) {
+        const dateObj = toDateSafe(appliedDate);
+        if (dateObj) {
+          const dateKey = dateObj.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+          if (dailyCounts.hasOwnProperty(dateKey)) {
+            dailyCounts[dateKey]++;
+          }
+        }
+      }
+    }
+
+    // Build series array
+    const series = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      const dateKey = date.toISOString().split("T")[0];
+      series.push({
+        date: dateKey,
+        count: dailyCounts[dateKey],
+      });
+    }
+
+    const endDateKey = endDate.toISOString().split("T")[0];
+    const startDateKey = startDate.toISOString().split("T")[0];
+
+    return res.json({
+      metric: "applications",
+      startDate: startDateKey,
+      endDate: endDateKey,
+      series,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to build daily analytics", details: error.message });
   }
 });
 
