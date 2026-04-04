@@ -4,7 +4,35 @@
  * Handles OTP flow, email verification, and status checks
  */
 
-import api from './backend.js';
+import { BACKEND_URL, getStoredAuthToken } from './backend.js';
+
+/**
+ * Helper to make authenticated API calls
+ */
+async function apiFetch(endpoint, options = {}) {
+  const token = getStoredAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error?.message || `Request failed with status ${response.status}`);
+  }
+
+  return data;
+}
 
 /**
  * Request OTP for email extraction verification
@@ -13,13 +41,16 @@ import api from './backend.js';
  */
 export async function requestOTP(email) {
   try {
-    const response = await api.post('/extract/request-otp', { email });
-    return response.data;
+    const response = await apiFetch('/api/extract/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    return response;
   } catch (error) {
     return {
       error: {
-        code: error.response?.data?.error?.code || 'REQUEST_FAILED',
-        message: error.response?.data?.error?.message || 'Failed to request OTP'
+        code: 'REQUEST_FAILED',
+        message: error.message || 'Failed to request OTP'
       }
     };
   }
@@ -32,15 +63,16 @@ export async function requestOTP(email) {
  */
 export async function verifyOTP(code) {
   try {
-    const response = await api.post('/extract/verify-otp', { code });
-    return response.data;
+    const response = await apiFetch('/api/extract/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+    return response;
   } catch (error) {
-    const errorData = error.response?.data?.error || {};
     return {
       error: {
-        code: errorData.code || 'VERIFICATION_FAILED',
-        message: errorData.message || 'Failed to verify OTP',
-        details: errorData.details
+        code: 'VERIFICATION_FAILED',
+        message: error.message || 'Failed to verify OTP'
       }
     };
   }
@@ -54,13 +86,16 @@ export async function verifyOTP(code) {
  */
 export async function verifyEmailToken(token) {
   try {
-    const response = await api.post('/extract/verify-email', { token });
-    return response.data;
+    const response = await apiFetch('/api/extract/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    return response;
   } catch (error) {
     return {
       error: {
-        code: error.response?.data?.error?.code || 'VERIFICATION_FAILED',
-        message: error.response?.data?.error?.message || 'Failed to verify email'
+        code: 'VERIFICATION_FAILED',
+        message: error.message || 'Failed to verify email'
       }
     };
   }
@@ -72,13 +107,15 @@ export async function verifyEmailToken(token) {
  */
 export async function getExtractionStatus() {
   try {
-    const response = await api.get('/extract/status');
-    return response.data;
+    const response = await apiFetch('/api/extract/status', {
+      method: 'GET',
+    });
+    return response;
   } catch (error) {
     return {
       error: {
-        code: error.response?.data?.error?.code || 'STATUS_FAILED',
-        message: error.response?.data?.error?.message || 'Failed to get extraction status'
+        code: 'STATUS_FAILED',
+        message: error.message || 'Failed to get extraction status'
       }
     };
   }
@@ -91,15 +128,15 @@ export async function getExtractionStatus() {
  */
 export async function getAuditLog(limit = 50) {
   try {
-    const response = await api.get('/extract/audit-log', {
-      params: { limit: Math.min(limit, 100) }
+    const response = await apiFetch(`/api/extract/audit-log?limit=${Math.min(limit, 100)}`, {
+      method: 'GET',
     });
-    return response.data;
+    return response;
   } catch (error) {
     return {
       error: {
-        code: error.response?.data?.error?.code || 'AUDIT_FAILED',
-        message: error.response?.data?.error?.message || 'Failed to retrieve audit log'
+        code: 'AUDIT_FAILED',
+        message: error.message || 'Failed to retrieve audit log'
       }
     };
   }
