@@ -73,6 +73,19 @@ export function AuthProvider({ children }) {
     return payload?.user || null;
   }
 
+  // NEW: Helper to check if email is verified
+  function isEmailVerified() {
+    return user?.is_email_verified || false;
+  }
+
+  // NEW: Get verification status
+  function getVerificationStatus() {
+    return {
+      isVerified: Boolean(user?.email_verified_at),
+      verifiedAt: user?.email_verified_at || null,
+    };
+  }
+
   const value = useMemo(
     () => ({
       user,
@@ -82,6 +95,8 @@ export function AuthProvider({ children }) {
       register,
       logout,
       refreshUser,
+      isEmailVerified,
+      getVerificationStatus,
     }),
     [user, isInitializing]
   );
