@@ -9,7 +9,7 @@
  * @param {Object} req - Express request object
  * @returns {string} Client IP address
  */
-export function getClientIP(req) {
+function getClientIP(req) {
   // Check for IP from a proxy
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -26,7 +26,7 @@ export function getClientIP(req) {
  * @param {Object} req - Express request object
  * @returns {string} User agent string
  */
-export function getUserAgent(req) {
+function getUserAgent(req) {
   return req.headers['user-agent'] || 'unknown';
 }
 
@@ -35,7 +35,7 @@ export function getUserAgent(req) {
  * @param {string} userAgent - User agent string
  * @returns {Object} Browser and OS info
  */
-export function parseBrowserInfo(userAgent) {
+function parseBrowserInfo(userAgent) {
   // Simple parsing; consider using ua-parser-js for production
   const isChrome = /Chrome/.test(userAgent);
   const isFirefox = /Firefox/.test(userAgent);
@@ -57,7 +57,7 @@ export function parseBrowserInfo(userAgent) {
  * @param {Object} req - Express request object
  * @returns {Object} Formatted client info
  */
-export function getClientInfo(req) {
+function getClientInfo(req) {
   const userAgent = getUserAgent(req);
   const browser = parseBrowserInfo(userAgent);
 
@@ -69,3 +69,10 @@ export function getClientInfo(req) {
     isMobile: browser.isMobile
   };
 }
+
+module.exports = {
+  getClientIP,
+  getUserAgent,
+  parseBrowserInfo,
+  getClientInfo
+};
