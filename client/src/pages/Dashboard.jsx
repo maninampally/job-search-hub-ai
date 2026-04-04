@@ -10,6 +10,7 @@ import {
   getJobs,
   getResumes,
   getWeeklyAnalytics,
+  getDailyAnalytics,
   getContacts,
   getReminders,
   getOutreach,
@@ -56,6 +57,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
   const [reminders, setReminders] = useState([]);
   const [outreachEntries, setOutreachEntries] = useState([]);
   const [weeklySummaryApi, setWeeklySummaryApi] = useState(null);
+  const [dailyApplicationsSeries, setDailyApplicationsSeries] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [jobSmartView, setJobSmartView] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -268,12 +270,13 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     setLoading(true);
 
     try {
-      const [health, auth, jobsPayload, weeklyAnalytics, resumesPayload, contactsResult, remindersResult, outreachResult] =
+      const [health, auth, jobsPayload, weeklyAnalytics, dailyAnalytics, resumesPayload, contactsResult, remindersResult, outreachResult] =
         await Promise.all([
           getHealth(),
           getAuthStatus(),
           getJobs(),
           getWeeklyAnalytics().catch(() => null),
+          getDailyAnalytics(7).catch(() => null),
           getResumes().catch(() => ({ resumes: [] })),
           getContacts().catch(() => ({ data: [] })),
           getReminders().catch(() => ({ data: [] })),
@@ -300,6 +303,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       );
 
       if (weeklyAnalytics) setWeeklySummaryApi(weeklyAnalytics);
+      if (dailyAnalytics?.series) setDailyApplicationsSeries(dailyAnalytics.series);
 
       const apiContacts = (contactsResult.data || []).map(normalizeContactForUI);
       setContacts(apiContacts);
@@ -366,6 +370,24 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       setErrorText(error.message || "Sync failed.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleChangeDailyRange(days, customStartDate = null, customEndDate = null) {
+    try {
+      let dailyAnalytics;
+      if (customStartDate && customEndDate) {
+        // Custom date range
+        dailyAnalytics = await getDailyAnalytics(customStartDate, customEndDate).catch(() => null);
+      } else {
+        // Preset days
+        dailyAnalytics = await getDailyAnalytics(days).catch(() => null);
+      }
+      if (dailyAnalytics?.series) {
+        setDailyApplicationsSeries(dailyAnalytics.series);
+      }
+    } catch (error) {
+      console.error("Failed to fetch daily analytics for range:", error);
     }
   }
 
@@ -465,10 +487,14 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             upcomingFollowUps={upcomingFollowUps}
             needsFollowUpJobs={jobActions.needsFollowUpJobs}
             pipelineColumns={pipelineColumns}
+            dailyApplicationsSeries={dailyApplicationsSeries}
+            isEmailVerified={user?.is_email_verified || false}
+            onChangeDailyRange={handleChangeDailyRange}
             onRefresh={loadDashboard}
             onConnectGmail={handleConnectGmail}
             onDisconnect={handleDisconnect}
             onSync={handleSync}
+            onNavigateView={handleViewChange}
           />
         )}
         {activeView === "Job Tracker" && (
