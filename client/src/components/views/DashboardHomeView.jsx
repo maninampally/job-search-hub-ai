@@ -7,6 +7,8 @@ const CARD_ITEMS = [
 
 import { useState } from "react";
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from "recharts";
+import EmailExtractionVerification from "../EmailExtractionVerification.jsx";
+import "../emailExtractionVerification.css";
 
 export default function DashboardHomeView({
   greetingText,
@@ -42,6 +44,7 @@ export default function DashboardHomeView({
   const [customEndDate, setCustomEndDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [showEmailExtraction, setShowEmailExtraction] = useState(false);
   const followUpRate = stats.active > 0
     ? Math.round((needsFollowUpJobs.length / stats.active) * 100)
     : 0;
@@ -118,6 +121,13 @@ export default function DashboardHomeView({
         </button>
         <button type="button" onClick={onSync} disabled={!connected || syncing || !isEmailVerified}>
           {syncing ? "Syncing..." : "Sync Jobs"}
+        </button>
+        <button 
+          type="button" 
+          onClick={() => setShowEmailExtraction(true)}
+          title="Enable email extraction verification"
+        >
+          Enable Email Extraction
         </button>
       </section>
 
@@ -325,6 +335,18 @@ export default function DashboardHomeView({
           Open full pipeline in Job Tracker
         </button>
       </section>
+
+      {showEmailExtraction && (
+        <div className="modal-overlay">
+          <EmailExtractionVerification
+            onSuccess={() => {
+              setShowEmailExtraction(false);
+              onRefresh();
+            }}
+            onCancel={() => setShowEmailExtraction(false)}
+          />
+        </div>
+      )}
     </>
   );
 }
