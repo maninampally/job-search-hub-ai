@@ -8,17 +8,17 @@
  * GET /api/extract/audit-log — View audit log (admin)
  */
 
-import express from 'express';
-import requireUserAuth from '../middleware/requireUserAuth.js';
-import { getClientIP, getUserAgent } from '../utils/requestUtils.js';
-import {
+const express = require('express');
+const { requireUserAuth } = require('../middleware/requireUserAuth');
+const { getClientIP, getUserAgent } = require('../utils/requestUtils');
+const {
   requestOTP,
   verifyOTP,
   generateVerificationLink,
   verifyEmailToken,
   getExtractionStatus,
   getAuditLog
-} from '../services/emailExtractionService.js';
+} = require('../services/emailExtractionService');
 
 const router = express.Router();
 
@@ -217,4 +217,4 @@ router.get('/audit-log', requireUserAuth, async (req, res) => {
   }
 });
 
-export default router;
+module.exports = { emailExtractionRoutes: router };

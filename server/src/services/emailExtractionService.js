@@ -4,8 +4,8 @@
  * Manages security policies: lockouts, expiration, one-time use, audit logging
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import {
+const { v4: uuidv4 } = require('uuid');
+const {
   generateOTP,
   generateVerificationToken,
   isValidEmail,
@@ -20,7 +20,7 @@ import {
   maskEmail,
   isValidOTPFormat,
   formatErrorResponse
-} from '../utils/emailExtractionUtils.js';
+} = require('../utils/emailExtractionUtils');
 
 const MAX_OTP_ATTEMPTS = 5;
 const OTP_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
@@ -35,7 +35,7 @@ const OTP_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Result with status and masked email
  */
-export async function requestOTP(db, userId, email, ipAddress, userAgent) {
+async function requestOTP(db, userId, email, ipAddress, userAgent) {
   const sanitized = sanitizeEmail(email);
 
   // Validation
@@ -129,7 +129,7 @@ export async function requestOTP(db, userId, email, ipAddress, userAgent) {
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Result with success status
  */
-export async function verifyOTP(db, userId, code, ipAddress, userAgent) {
+async function verifyOTP(db, userId, code, ipAddress, userAgent) {
   // Validate format
   if (!isValidOTPFormat(code)) {
     return formatErrorResponse('INVALID_FORMAT', 'OTP must be 6 digits');
@@ -234,7 +234,7 @@ export async function verifyOTP(db, userId, code, ipAddress, userAgent) {
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Link token for email notification
  */
-export async function generateVerificationLink(db, userId, email, ipAddress, userAgent) {
+async function generateVerificationLink(db, userId, email, ipAddress, userAgent) {
   try {
     const sanitized = sanitizeEmail(email);
     const token = generateVerificationToken();
@@ -274,7 +274,7 @@ export async function generateVerificationLink(db, userId, email, ipAddress, use
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Verification result
  */
-export async function verifyEmailToken(db, userId, token, ipAddress, userAgent) {
+async function verifyEmailToken(db, userId, token, ipAddress, userAgent) {
   try {
     // Find token
     const tokenResult = await db.query(
@@ -335,7 +335,7 @@ export async function verifyEmailToken(db, userId, token, ipAddress, userAgent) 
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Current extraction status
  */
-export async function getExtractionStatus(db, userId) {
+async function getExtractionStatus(db, userId) {
   try {
     const result = await db.query(
       `SELECT id, email, otp_verified, email_extraction_enabled, extraction_verified_at 
@@ -374,7 +374,7 @@ export async function getExtractionStatus(db, userId) {
  * @param {string} errorMessage - Error details if failed
  * @returns {Promise<void>}
  */
-export async function logAuditAction(db, userId, action, status, ipAddress, userAgent, errorMessage = null) {
+async function logAuditAction(db, userId, action, status, ipAddress, userAgent, errorMessage = null) {
   try {
     await db.query(
       `INSERT INTO extraction_audit_log (user_id, action, status, ip_address, user_agent, error_message)
@@ -393,7 +393,7 @@ export async function logAuditAction(db, userId, action, status, ipAddress, user
  * @param {number} limit - Max records to return
  * @returns {Promise<Object>} Audit log records
  */
-export async function getAuditLog(db, userId, limit = 50) {
+async function getAuditLog(db, userId, limit = 50) {
   try {
     const result = await db.query(
       `SELECT id, user_id, action, status, ip_address, timestamp, error_message
@@ -413,3 +413,13 @@ export async function getAuditLog(db, userId, limit = 50) {
     return formatErrorResponse('ERROR', 'Failed to retrieve audit log');
   }
 }
+
+module.exports = {
+  requestOTP,
+  verifyOTP,
+  generateVerificationLink,
+  verifyEmailToken,
+  getExtractionStatus,
+  logAuditAction,
+  getAuditLog
+};
