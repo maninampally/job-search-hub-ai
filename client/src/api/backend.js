@@ -189,6 +189,21 @@ export async function getWeeklyAnalytics() {
 	return parseResponse(response);
 }
 
+export async function getDailyAnalytics(daysOrStart = 7, endDate = null) {
+	let url = `${BACKEND_URL}/jobs/analytics/daily?metric=applications`;
+	
+	if (typeof daysOrStart === "number") {
+		// Preset days
+		url += `&days=${daysOrStart}`;
+	} else if (typeof daysOrStart === "string" && endDate) {
+		// Custom date range (startDate and endDate)
+		url += `&startDate=${encodeURIComponent(daysOrStart)}&endDate=${encodeURIComponent(endDate)}`;
+	}
+	
+	const response = await apiFetch(url);
+	return parseResponse(response);
+}
+
 export async function sendDueReminderHooks(reminders) {
 	const response = await apiFetch(`${BACKEND_URL}/jobs/notifications/hooks/due-reminders`, {
 		method: "POST",
@@ -501,4 +516,30 @@ export async function deleteOutreach(outreachId) {
 		success: true,
 		message: body?.message,
 	};
+}
+
+// ============================================================================
+// EMAIL VERIFICATION API (NEW: for verified email-bound extraction)
+// ============================================================================
+
+/**
+ * Request a verification email
+ * POST /auth/verify-email/request — authenticated
+ */
+export async function requestEmailVerification() {
+	const response = await apiFetch(`${BACKEND_URL}/auth/verify-email/request`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({}),
+	});
+	return parseResponse(response);
+}
+
+/**
+ * Confirm email verification token
+ * GET /auth/verify-email/confirm?token=...  — public
+ */
+export async function confirmEmailVerification(token) {
+	const response = await apiFetch(`${BACKEND_URL}/auth/verify-email/confirm?token=${encodeURIComponent(token)}`);
+	return parseResponse(response);
 }
