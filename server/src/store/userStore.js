@@ -278,6 +278,96 @@ async function updateUserPassword(userId, passwordHash) {
   );
 }
 
+// ============================================================================
+// EMAIL VERIFICATION HELPERS (added for verified email-bound extraction)
+// ============================================================================
+
+async function getUserByVerificationTokenHash(tokenHash) {
+  if (!tokenHash) return null;
+
+  return withSupabaseFallback(
+    async () => {
+      const { data, error } = await supabase
+        .from("app_users")
+        .select("*")
+        .eq("email_verification_token_hash", tokenHash)
+        .maybeSingle();
+      if (error) throw error;
+      return mapDbToUser(data);
+    },
+    async () => {
+      const user = localStore.users.find(u => u.email_verification_token_hash === tokenHash);
+      return user || null;
+    }
+  );
+}
+
+async function updateUserVerification(userId, options = {}) {
+  const { tokenHash = null, verifiedAt = null } = options;
+
+  return withSupabaseFallback(
+    async () => {
+      const updatePayload = { updated_at: new Date().toISOString() };
+      if (verifiedAt !== undefined) updatePayload.email_verified_at = verifiedAt;
+      if (tokenHash !== undefined) updatePayload.email_verification_token_hash = tokenHash;
+
+      const { data, error } = await supabase
+        .from("app_users")
+        .update(updatePayload)
+        .eq("id", userId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return mapDbToUser(data);
+    },
+    async () => {
+      const user = localStore.users.find(u => u.id === userId);
+      if (user) {
+        if (verifiedAt !== undefined) user.email_verified_at = verifiedAt;
+        if (tokenHash !== undefined) user.email_verification_token_hash = tokenHash;
+        user.updated_at = new Date().toISOString();
+        saveLocalStore(localStore);
+      }
+      return user || null;
+    }
+  );
+}
+
+async function setEmailVerificationTokenHash(userId, tokenHash, sentAt = new Date()) {
+  return withSupabaseFallback(
+    async () => {
+      const { data, error } = await supabase
+        .from("app_users")
+        .update({
+          email_verification_token_hash: tokenHash,
+          email_verification_sent_at: sentAt.toISOString(),
+          email_verification_attempts: supabase.raw("COALESCE(email_verification_attempts, 0) + 1"),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return mapDbToUser(data);
+    },
+    async () => {
+      const user = localStore.users.find(u => u.id === userId);
+      if (user) {
+        user.email_verification_token_hash = tokenHash;
+        user.email_verification_sent_at = sentAt.toISOString();
+        user.email_verification_attempts = (user.email_verification_attempts || 0) + 1;
+        user.updated_at = new Date().toISOString();
+        saveLocalStore(localStore);
+      }
+      return user || null;
+    }
+  );
+}
+
+function isEmailVerified(user) {
+  return user?.email_verified_at !== null && user?.email_verified_at !== undefined;
+}
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -286,4 +376,9 @@ module.exports = {
   updateUserPassword,
   touchLastLogin,
   stripPasswordHash,
+  // Verification helpers
+  getUserByVerificationTokenHash,
+  updateUserVerification,
+  setEmailVerificationTokenHash,
+  isEmailVerified,
 };

@@ -8,6 +8,7 @@ const localStorePath = path.resolve(__dirname, "../../data/local-store.json");
 function createInitialMemory() {
   return {
     tokens: null,
+    userTokens: {},  // NEW: per-user token storage
     jobs: [],
     emailsByJob: {},
     statusTimelineByJob: {},
@@ -55,8 +56,14 @@ function loadLocalMemory() {
         }))
       : [];
 
+    const parsedUserTokens =
+      parsed.userTokens && typeof parsed.userTokens === "object"
+        ? parsed.userTokens
+        : {};
+
     return {
       tokens: parsed.tokens || null,
+      userTokens: parsedUserTokens,  // NEW: load per-user tokens
       jobs: parsedJobs,
       emailsByJob: parsedEmailsByJob,
       statusTimelineByJob: parsedTimelineByJob,
@@ -94,6 +101,7 @@ function saveLocalMemory(memory) {
       JSON.stringify(
         {
           tokens: memory.tokens,
+          userTokens: memory.userTokens,  // NEW: save per-user tokens
           jobs: memory.jobs,
           emailsByJob: memory.emailsByJob,
           statusTimelineByJob: memory.statusTimelineByJob,
@@ -296,17 +304,24 @@ async function getLastChecked() {
     return memory.lastChecked;
   }
 
-  const { data, error } = await supabase
-    .from("oauth_tokens")
-    .select("last_checked")
-    .eq("id", 1)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("oauth_tokens")
+      .select("last_checked")
+      .eq("id", 1)
+      .maybeSingle();
 
-  if (error) {
-    throw error;
+    if (error) {
+      // id=1 may not exist in per-user design, just return null
+      return null;
+    }
+
+    return data?.last_checked || null;
+  } catch (err) {
+    // If query fails, just return null instead of crashing
+    console.warn("[getLastChecked] error:", err.message);
+    return null;
   }
-
-  return data?.last_checked || null;
 }
 
 async function setLastChecked(lastChecked) {
@@ -1272,13 +1287,138 @@ async function deleteOutreach(outreachId, options = {}) {
   saveLocalMemory(memory);
 }
 
+// ============================================================================
+// PER-USER TOKEN STORAGE (NEW: replaces global token storage with per-user)
+// ============================================================================
+
+async function getTokensByUser(userId) {
+  if (!userId) {
+    console.warn("[getTokensByUser] userId required");
+    return null;
+  }
+
+  if (!supabase) {
+    // Local memory: user-scoped tokens
+    return memory.userTokens?.[userId] || null;
+  }
+
+  const { data, error } = await supabase
+    .from("oauth_tokens")
+    .select("*")
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+
+  if (error && !error.message.includes("No rows")) {
+    console.error(`[getTokensByUser] ${userId}:`, error.message);
+  }
+
+  return data || null;
+}
+
+async function setTokensForUser(userId, tokens, verifiedEmailAddress) {
+  if (!userId || !tokens) {
+    throw new Error("setTokensForUser: userId and tokens required");
+  }
+
+  if (!supabase) {
+    // Local memory: store per-user
+    memory.userTokens = memory.userTokens || {};
+    memory.userTokens[userId] = {
+      ...tokens,
+      verified_email_address: verifiedEmailAddress,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    saveLocalMemory(memory);
+    return memory.userTokens[userId];
+  }
+
+  const { data, error } = await supabase
+    .from("oauth_tokens")
+    .upsert({
+      id: `oauth_${userId}`,
+      owner_user_id: userId,
+      access_token: tokens.access_token || tokens.accessToken,
+      refresh_token: tokens.refresh_token || tokens.refreshToken,
+      expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+      verified_email_address: verifiedEmailAddress,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: "owner_user_id"
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error(`[setTokensForUser] ${userId}:`, error.message);
+    throw error;
+  }
+
+  return data;
+}
+
+async function refreshTokenIfExpiredForUser(userId) {
+  const storedTokens = await getTokensByUser(userId);
+  if (!storedTokens) {
+    console.warn(`[refreshTokenIfExpiredForUser] ${userId} has no stored tokens`);
+    return null;
+  }
+
+  const now = new Date();
+  const expiresAt = storedTokens.expires_at ? new Date(storedTokens.expires_at) : null;
+
+  if (expiresAt && expiresAt > now) {
+    return storedTokens;  // Still valid, no refresh needed
+  }
+
+  if (!storedTokens.refresh_token) {
+    console.warn(`[refreshTokenIfExpiredForUser] ${userId} has no refresh_token`);
+    return null;
+  }
+
+  try {
+    // Note: This requires createGmailClient to be imported from gmail.js
+    // For now, return null and let jobSync.js handle refresh separately
+    console.warn(`[refreshTokenIfExpiredForUser] ${userId} token expired, needs manual refresh`);
+    return null;
+  } catch (error) {
+    console.error(`[refreshTokenIfExpiredForUser] ${userId}:`, error.message);
+    return null;
+  }
+}
+
+async function getAllUsersWithActiveTokens() {
+  if (!supabase) {
+    // Local memory: return keys of userTokens
+    return Object.keys(memory.userTokens || {});
+  }
+
+  const { data, error } = await supabase
+    .from("oauth_tokens")
+    .select("owner_user_id");
+
+  if (error) {
+    console.error("[getAllUsersWithActiveTokens]:", error.message);
+    return [];
+  }
+
+  return data?.map(row => row.owner_user_id) || [];
+}
+
 module.exports = {
+  // Legacy global token functions (kept for backward compatibility)
   getTokens,
   setTokens,
   clearTokens,
   getLinkedUserId,
   getLastChecked,
   setLastChecked,
+  // New per-user token functions (replaces above in new code path)
+  getTokensByUser,
+  setTokensForUser,
+  refreshTokenIfExpiredForUser,
+  getAllUsersWithActiveTokens,
   getJobs,
   addJob,
   updateJob,
