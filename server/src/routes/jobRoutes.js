@@ -17,6 +17,8 @@ const { backfillJobEmailsFromExistingJobs, fetchJobEmails } = require("../servic
 const { getSyncStatus } = require("../services/syncState");
 const { env } = require("../config/env");
 const { VALID_STATUSES, EMAIL_TYPES } = require("../config/constants");
+const { rateLimitMiddleware } = require("../security/rateLimiter");
+const { logSync, logError } = require("../security/auditLogger");
 
 const jobRoutes = express.Router();
 
@@ -97,7 +99,7 @@ jobRoutes.get("/sync-status", (req, res) => {
   res.json(getSyncStatus(userId));
 });
 
-jobRoutes.post("/sync", async (req, res) => {
+jobRoutes.post("/sync", rateLimitMiddleware, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) {
     return res.status(401).json({ error: "Not authenticated" });
@@ -114,12 +116,18 @@ jobRoutes.post("/sync", async (req, res) => {
     return res.status(409).json({ error: "Sync already in progress for this user", isSyncing: true });
   }
 
-  // Run in background — respond immediately so UI isn't blocked
-  fetchJobEmails({ mode: "daily", userId }).catch((err) =>
-    console.error("[sync] background error:", err.message)
-  );
+  try {
+    logSync("SYNC_TRIGGERED", userId, { mode: "daily" });
+    // Run in background — respond immediately so UI isn't blocked
+    fetchJobEmails({ mode: "daily", userId }).catch((err) =>
+      console.error("[sync] background error:", err.message)
+    );
 
-  return res.json({ started: true, isSyncing: true });
+    return res.json({ started: true, isSyncing: true });
+  } catch (error) {
+    logError("SYNC_ERROR", error, userId);
+    return res.status(500).json({ error: "Sync failed", details: error.message });
+  }
 });
 
 jobRoutes.post("/backfill-emails", async (req, res) => {
