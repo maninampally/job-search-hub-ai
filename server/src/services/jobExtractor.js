@@ -1,6 +1,7 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const { env } = require("../config/env");
 const { withRetry, withTimeout } = require("../utils/asyncTools");
+const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
 
 const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
@@ -67,7 +68,9 @@ function cleanEmailBody(body) {
 
 async function extractJobInfo({ subject, from, date, body }) {
   try {
-    const cleanedBody = cleanEmailBody(body);
+    let cleanedBody = cleanEmailBody(body);
+    // Sanitize PII (SSN, credit cards, passwords, etc.) before sending to Claude
+    cleanedBody = sanitizeEmailForAI(cleanedBody);
     const res = await withRetry(
       () =>
         withTimeout(
