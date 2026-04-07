@@ -5,6 +5,7 @@ package-lock.json
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # Logs and reports
 *.log
@@ -12,6 +13,7 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+debug.log*
 
 # Build outputs
 dist/
@@ -32,8 +34,13 @@ Thumbs.db
 server/data/
 server/uploads/
 client/build/
+audit-logs/
 
-# Temporary Documentation (for features/bugs/todos in progress)
+# ============================================
+# PERSONAL/ROUGH WORK - Keep repo clean!
+# ============================================
+
+# TODO/FIXME/NOTES (temporary documentation)
 TODO.md
 TODO*.md
 FIXME.md
@@ -42,27 +49,38 @@ NOTES.md
 NOTES*.md
 TEMP*.md
 TEMP/
+SCRATCH.md
+BRAINSTORM.md
+IDEAS*.md
 
-# Feature/Bug tracking docs (temporary)
+# Feature/Bug tracking (temporary)
 *_FEATURE.md
 *_BUG.md
 *_TODO.md
 *_ISSUE.md
 *_WIP.md
 *_IN_PROGRESS.md
+*_DEBUGGING.md
 
-# Copilot/AI Prompt files (temporary)
+# AI/Prompt files (personal use)
 *_prompt.md
+*_prompt.txt
 copilot_prompt.md
 *_copilot.md
+*_claude.md
+*_gpt.md
+*.prompt.md
+prompt_*.md
 
-# Deployment/Testing checklists (temporary, regenerated per deployment)
+# Deployment/Testing checklists (regenerated per deployment)
 DEPLOYMENT_CHECKLIST.md
 DEPLOYMENT_READINESS.md
 SMOKE_REPORT.md
+TESTING_REPORT.md
 *_CHECKLIST.md
 *_READINESS.md
 *_REPORT.md
+*_test_*.md
 
 # Development/Progress notes (temporary)
 FRONTEND_IMPROVEMENTS.md
@@ -71,12 +89,37 @@ BACKEND_IMPROVEMENTS.md
 PROGRESS.md
 *_PROGRESS.md
 BROKEN.md
+BLOCKED.md
+*_analysis.md
+*_research.md
+*_investigation.md
+
+# Quick notes/scratch files
+*_notes.md
+*_scratch.md
+*_quick.md
+*_draft.md
+*_rough.md
+scratch/
+notes/
+drafts/
+quick-notes/
 
 # Session/Temporary data
 session/
 .session
 *.tmp
 *.bak
+*.swp
+.claude/
+.vscode-settings/
+
+# Debug/Development output
+debug/
+*.dump
+*.stack
+core.*
+.debuginfo
 
 # OS files
 .DS_Store
@@ -84,13 +127,35 @@ session/
 .LSOverride
 Thumbs.db
 ehthumbs.db
+desktop.ini
 
 # Jest/Test coverage
 .nyc_output/
 *.lcov
+coverage/
+.coverage
 
-# Misc
+# Security/Keys (sensitive files)
 *.pem
 *.key
+*.crt
+*.p12
+*.pfx
+secrets.json
+.env.*.key
+
+# Cache
 .cache/
 .eslintcache
+.prettierignore
+node_modules/.cache/
+
+# Build artifacts
+*.min.js
+*.min.css
+*.map
+
+# Design/Brand assets (AI generated prompts - personal work)
+IMAGE_GENERATION_PROMPTS.md
+DESIGN_NOTES.md
+BRAND_GUIDELINES.md
