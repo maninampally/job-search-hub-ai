@@ -33,6 +33,10 @@ const env = {
   AUTH_TOKEN_SECRET: process.env.AUTH_TOKEN_SECRET || "dev-local-auth-secret-change-me",
   AUTH_TOKEN_TTL_HOURS: Number(process.env.AUTH_TOKEN_TTL_HOURS || 24),
   SESSION_SECRET: process.env.SESSION_SECRET || "dev-session-secret-change-me",
+  TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY || "",
+  RATE_LIMIT_SYNC_PER_HOUR: Number(process.env.RATE_LIMIT_SYNC_PER_HOUR || 3),
+  AUDIT_LOG_ENABLED: String(process.env.AUDIT_LOG_ENABLED || "true").toLowerCase() !== "false",
+  AUDIT_LOG_RETENTION_DAYS: Number(process.env.AUDIT_LOG_RETENTION_DAYS || 90),
   ENVIRONMENT: process.env.NODE_ENV || "development",
 };
 
