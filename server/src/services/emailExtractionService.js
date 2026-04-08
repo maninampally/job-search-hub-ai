@@ -5,6 +5,8 @@
  */
 
 const { v4: uuidv4 } = require('uuid');
+const { query: dbQuery } = require('./dbAdapter');
+const { sendOTPEmail } = require('../utils/emailSender');
 const {
   generateOTP,
   generateVerificationToken,
@@ -27,38 +29,38 @@ const OTP_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Request OTP for email extraction consent
- * Validates email, checks rate limits, logs action
- * @param {Object} db - Database connection
+ * Validates email, checks rate limits, sends OTP via email, logs action
  * @param {string} userId - User ID
  * @param {string} email - Email address
+ * @param {string} userName - User name for email personalization
  * @param {string} ipAddress - Client IP address
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Result with status and masked email
  */
-async function requestOTP(db, userId, email, ipAddress, userAgent) {
+async function requestOTP(userId, email, userName = 'User', ipAddress, userAgent) {
   const sanitized = sanitizeEmail(email);
 
   // Validation
   if (!isValidEmail(sanitized)) {
-    await logAuditAction(db, userId, 'otp_requested', 'failed', ipAddress, userAgent, 'Invalid email format');
+    await logAuditAction(userId, 'otp_requested', 'failed', ipAddress, userAgent, 'Invalid email format');
     return formatErrorResponse('INVALID_EMAIL', 'Invalid email format');
   }
 
   try {
-    // Check if user is locked out
-    const user = await db.query('SELECT * FROM app_users WHERE id = $1', [userId]);
+    // Check if user exists
+    const user = await dbQuery('SELECT * FROM app_users WHERE id = $1', [userId]);
     if (user.rows.length === 0) {
       return formatErrorResponse('USER_NOT_FOUND', 'User not found');
     }
 
-    // Clean up expired OTP records (optional, but recommended)
-    await db.query(
+    // Clean up expired OTP records
+    await dbQuery(
       'DELETE FROM otp_verifications WHERE user_id = $1 AND expires_at < now()',
       [userId]
     );
 
     // Check for recent OTP requests (rate limiting: max 1 per minute)
-    const recentOTP = await db.query(
+    const recentOTP = await dbQuery(
       `SELECT * FROM otp_verifications 
        WHERE user_id = $1 AND created_at > now() - interval '1 minute'
        ORDER BY created_at DESC LIMIT 1`,
@@ -66,12 +68,12 @@ async function requestOTP(db, userId, email, ipAddress, userAgent) {
     );
 
     if (recentOTP.rows.length > 0) {
-      await logAuditAction(db, userId, 'otp_requested', 'failed', ipAddress, userAgent, 'Rate limited: OTP requested too soon');
+      await logAuditAction(userId, 'otp_requested', 'failed', ipAddress, userAgent, 'Rate limited: OTP requested too soon');
       return formatErrorResponse('RATE_LIMITED', 'OTP requested too soon. Please wait 1 minute before requesting another.');
     }
 
     // Get most recent OTP verification record
-    const lastOtp = await db.query(
+    const lastOtp = await dbQuery(
       `SELECT * FROM otp_verifications 
        WHERE user_id = $1 
        ORDER BY created_at DESC LIMIT 1`,
@@ -82,7 +84,7 @@ async function requestOTP(db, userId, email, ipAddress, userAgent) {
     if (lastOtp.rows.length > 0 && lastOtp.rows[0].blocked_until) {
       if (isLockedOut(lastOtp.rows[0].blocked_until)) {
         const remainingTime = getRemainingLockoutTime(lastOtp.rows[0].blocked_until);
-        await logAuditAction(db, userId, 'otp_requested', 'failed', ipAddress, userAgent, `Account locked out for ${remainingTime}s`);
+        await logAuditAction(userId, 'otp_requested', 'failed', ipAddress, userAgent, `Account locked out for ${remainingTime}s`);
         return formatErrorResponse('ACCOUNT_LOCKED', `Account locked. Try again in ${remainingTime} seconds.`, { retryAfter: remainingTime });
       }
     }
@@ -92,29 +94,30 @@ async function requestOTP(db, userId, email, ipAddress, userAgent) {
     const expiresAt = calculateOTPExpiration();
 
     // Insert OTP into database
-    const result = await db.query(
+    const result = await dbQuery(
       `INSERT INTO otp_verifications (user_id, code, expires_at)
        VALUES ($1, $2, $3)
        RETURNING id, code`,
       [userId, code, expiresAt]
     );
 
-    // Log audit action
-    await logAuditAction(db, userId, 'otp_requested', 'success', ipAddress, userAgent);
+    // Send OTP via email
+    const emailResult = await sendOTPEmail(sanitized, code, userName, 'extraction');
 
-    // Return response with masked email and OTP (in dev/test only; remove in production)
+    // Log audit action
+    await logAuditAction(userId, 'otp_requested', 'success', ipAddress, userAgent);
+
     return {
       success: true,
       message: 'OTP sent to your email',
       maskedEmail: maskEmail(sanitized),
       expiresIn: 900, // 15 minutes in seconds
-      // NOTE: In production, send OTP via email and don't return it
-      // For testing/dev, optionally return code
-      code // REMOVE IN PRODUCTION
+      // Include code in response only if OTP_SEND_MODE is 'console' (development)
+      ...(emailResult.code && { code: emailResult.code })
     };
   } catch (error) {
     console.error('Error in requestOTP:', error);
-    await logAuditAction(db, userId, 'otp_requested', 'failed', ipAddress, userAgent, error.message);
+    await logAuditAction(userId, 'otp_requested', 'failed', ipAddress, userAgent, error.message);
     return formatErrorResponse('ERROR', 'Failed to request OTP');
   }
 }
@@ -122,14 +125,13 @@ async function requestOTP(db, userId, email, ipAddress, userAgent) {
 /**
  * Verify OTP code
  * Validates format, checks expiration, enforces attempt limits, applies lockouts
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @param {string} code - OTP code to verify
  * @param {string} ipAddress - Client IP address
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Result with success status
  */
-async function verifyOTP(db, userId, code, ipAddress, userAgent) {
+async function verifyOTP(userId, code, ipAddress, userAgent) {
   // Validate format
   if (!isValidOTPFormat(code)) {
     return formatErrorResponse('INVALID_FORMAT', 'OTP must be 6 digits');
@@ -137,7 +139,7 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
 
   try {
     // Get most recent OTP for user
-    const otpResult = await db.query(
+    const otpResult = await dbQuery(
       `SELECT * FROM otp_verifications 
        WHERE user_id = $1 
        ORDER BY created_at DESC LIMIT 1`,
@@ -145,7 +147,7 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
     );
 
     if (otpResult.rows.length === 0) {
-      await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, 'No OTP found');
+      await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, 'No OTP found');
       return formatErrorResponse('NO_OTP', 'No OTP request found. Request a new one.');
     }
 
@@ -153,20 +155,20 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
 
     // Check if already used
     if (otp.used) {
-      await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, 'OTP already used');
+      await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, 'OTP already used');
       return formatErrorResponse('OTP_USED', 'OTP has already been used');
     }
 
     // Check if expired
     if (isOTPExpired(otp.expires_at)) {
-      await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, 'OTP expired');
+      await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, 'OTP expired');
       return formatErrorResponse('OTP_EXPIRED', 'OTP has expired. Request a new one.');
     }
 
     // Check lockout status
     if (isLockedOut(otp.blocked_until)) {
       const remainingTime = getRemainingLockoutTime(otp.blocked_until);
-      await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, `Account locked for ${remainingTime}s`);
+      await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, `Account locked for ${remainingTime}s`);
       return formatErrorResponse('ACCOUNT_LOCKED', `Account locked. Try again in ${remainingTime} seconds.`, { retryAfter: remainingTime });
     }
 
@@ -178,39 +180,39 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
       // Apply lockout after max attempts
       if (newAttempts >= MAX_OTP_ATTEMPTS) {
         blockedUntil = calculateLockoutExpiration();
-        await db.query(
+        await dbQuery(
           `UPDATE otp_verifications SET attempts = $1, blocked_until = $2 WHERE id = $3`,
           [newAttempts, blockedUntil, otp.id]
         );
-        await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, `Wrong code. Account locked (${MAX_OTP_ATTEMPTS} attempts reached)`);
+        await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, `Wrong code. Account locked (${MAX_OTP_ATTEMPTS} attempts reached)`);
         return formatErrorResponse('ACCOUNT_LOCKED', `Too many failed attempts. Account locked for 15 minutes.`);
       }
 
       // Increment attempt counter
-      await db.query(
+      await dbQuery(
         `UPDATE otp_verifications SET attempts = $1 WHERE id = $2`,
         [newAttempts, otp.id]
       );
 
       const remainingAttempts = MAX_OTP_ATTEMPTS - newAttempts;
-      await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, `Wrong code (${remainingAttempts} attempts left)`);
+      await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, `Wrong code (${remainingAttempts} attempts left)`);
       return formatErrorResponse('INVALID_CODE', `Invalid OTP. ${remainingAttempts} attempts remaining.`, { attemptsRemaining: remainingAttempts });
     }
 
     // Mark OTP as used
-    await db.query(
+    await dbQuery(
       `UPDATE otp_verifications SET used = true WHERE id = $1`,
       [otp.id]
     );
 
     // Update user extraction status
-    await db.query(
+    await dbQuery(
       `UPDATE app_users SET otp_verified = true, extraction_verified_at = now() WHERE id = $1`,
       [userId]
     );
 
     // Log audit action
-    await logAuditAction(db, userId, 'otp_verified', 'success', ipAddress, userAgent);
+    await logAuditAction(userId, 'otp_verified', 'success', ipAddress, userAgent);
 
     return {
       success: true,
@@ -219,7 +221,7 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
     };
   } catch (error) {
     console.error('Error in verifyOTP:', error);
-    await logAuditAction(db, userId, 'otp_verified', 'failed', ipAddress, userAgent, error.message);
+    await logAuditAction(userId, 'otp_verified', 'failed', ipAddress, userAgent, error.message);
     return formatErrorResponse('ERROR', 'Failed to verify OTP');
   }
 }
@@ -227,28 +229,27 @@ async function verifyOTP(db, userId, code, ipAddress, userAgent) {
 /**
  * Generate and send email verification link
  * Creates a UUID token, stores it, and returns token for email notification
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @param {string} email - Email address (already verified via OTP)
  * @param {string} ipAddress - Client IP address
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Link token for email notification
  */
-async function generateVerificationLink(db, userId, email, ipAddress, userAgent) {
+async function generateVerificationLink(userId, email, ipAddress, userAgent) {
   try {
     const sanitized = sanitizeEmail(email);
     const token = generateVerificationToken();
     const expiresAt = calculateTokenExpiration();
 
     // Insert token into database
-    await db.query(
+    await dbQuery(
       `INSERT INTO email_verify_tokens (user_id, token, expires_at)
        VALUES ($1, $2, $3)`,
       [userId, token, expiresAt]
     );
 
     // Log audit action
-    await logAuditAction(db, userId, 'link_sent', 'success', ipAddress, userAgent);
+    await logAuditAction(userId, 'link_sent', 'success', ipAddress, userAgent);
 
     return {
       success: true,
@@ -259,7 +260,7 @@ async function generateVerificationLink(db, userId, email, ipAddress, userAgent)
     };
   } catch (error) {
     console.error('Error in generateVerificationLink:', error);
-    await logAuditAction(db, userId, 'link_sent', 'failed', ipAddress, userAgent, error.message);
+    await logAuditAction(userId, 'link_sent', 'failed', ipAddress, userAgent, error.message);
     return formatErrorResponse('ERROR', 'Failed to generate verification link');
   }
 }
@@ -267,24 +268,23 @@ async function generateVerificationLink(db, userId, email, ipAddress, userAgent)
 /**
  * Verify email verification token
  * Confirms token, marks as used, enables extraction
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @param {string} token - Verification token
  * @param {string} ipAddress - Client IP address
  * @param {string} userAgent - Client user agent
  * @returns {Promise<Object>} Verification result
  */
-async function verifyEmailToken(db, userId, token, ipAddress, userAgent) {
+async function verifyEmailToken(userId, token, ipAddress, userAgent) {
   try {
     // Find token
-    const tokenResult = await db.query(
+    const tokenResult = await dbQuery(
       `SELECT * FROM email_verify_tokens 
        WHERE user_id = $1 AND token = $2`,
       [userId, token]
     );
 
     if (tokenResult.rows.length === 0) {
-      await logAuditAction(db, userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token not found');
+      await logAuditAction(userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token not found');
       return formatErrorResponse('INVALID_TOKEN', 'Invalid verification token');
     }
 
@@ -292,30 +292,30 @@ async function verifyEmailToken(db, userId, token, ipAddress, userAgent) {
 
     // Check if already used
     if (tokenRecord.used) {
-      await logAuditAction(db, userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token already used');
+      await logAuditAction(userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token already used');
       return formatErrorResponse('TOKEN_USED', 'Verification token has already been used');
     }
 
     // Check if expired
     if (isTokenExpired(tokenRecord.expires_at)) {
-      await logAuditAction(db, userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token expired');
+      await logAuditAction(userId, 'link_verified', 'failed', ipAddress, userAgent, 'Token expired');
       return formatErrorResponse('TOKEN_EXPIRED', 'Verification token has expired');
     }
 
     // Mark token as used
-    await db.query(
+    await dbQuery(
       `UPDATE email_verify_tokens SET used = true WHERE id = $1`,
       [tokenRecord.id]
     );
 
     // Enable extraction for user
-    await db.query(
+    await dbQuery(
       `UPDATE app_users SET email_extraction_enabled = true WHERE id = $1`,
       [userId]
     );
 
     // Log audit action
-    await logAuditAction(db, userId, 'enabled', 'success', ipAddress, userAgent);
+    await logAuditAction(userId, 'enabled', 'success', ipAddress, userAgent);
 
     return {
       success: true,
@@ -324,21 +324,20 @@ async function verifyEmailToken(db, userId, token, ipAddress, userAgent) {
     };
   } catch (error) {
     console.error('Error in verifyEmailToken:', error);
-    await logAuditAction(db, userId, 'link_verified', 'failed', ipAddress, userAgent, error.message);
+    await logAuditAction(userId, 'link_verified', 'failed', ipAddress, userAgent, error.message);
     return formatErrorResponse('ERROR', 'Failed to verify email token');
   }
 }
 
 /**
  * Get extraction status for user
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @returns {Promise<Object>} Current extraction status
  */
-async function getExtractionStatus(db, userId) {
+async function getExtractionStatus(userId) {
   try {
-    const result = await db.query(
-      `SELECT id, email, otp_verified, email_extraction_enabled, extraction_verified_at 
+    const result = await dbQuery(
+      `SELECT id, email, otp_verified, email_extraction_enabled, extraction_verified_at
        FROM app_users WHERE id = $1`,
       [userId]
     );
@@ -365,7 +364,6 @@ async function getExtractionStatus(db, userId) {
 
 /**
  * Log audit action for compliance and security monitoring
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @param {string} action - Action type
  * @param {string} status - success or failed
@@ -374,9 +372,9 @@ async function getExtractionStatus(db, userId) {
  * @param {string} errorMessage - Error details if failed
  * @returns {Promise<void>}
  */
-async function logAuditAction(db, userId, action, status, ipAddress, userAgent, errorMessage = null) {
+async function logAuditAction(userId, action, status, ipAddress, userAgent, errorMessage = null) {
   try {
-    await db.query(
+    await dbQuery(
       `INSERT INTO extraction_audit_log (user_id, action, status, ip_address, user_agent, error_message)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [userId, action, status, ipAddress, userAgent, errorMessage]
@@ -388,14 +386,13 @@ async function logAuditAction(db, userId, action, status, ipAddress, userAgent, 
 
 /**
  * Get audit log for user (admin/compliance view)
- * @param {Object} db - Database connection
  * @param {string} userId - User ID
  * @param {number} limit - Max records to return
  * @returns {Promise<Object>} Audit log records
  */
-async function getAuditLog(db, userId, limit = 50) {
+async function getAuditLog(userId, limit = 50) {
   try {
-    const result = await db.query(
+    const result = await dbQuery(
       `SELECT id, user_id, action, status, ip_address, timestamp, error_message
        FROM extraction_audit_log
        WHERE user_id = $1

@@ -2,7 +2,7 @@ const env = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   REDIRECT_URI: process.env.REDIRECT_URI,
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
   PORT: Number(process.env.PORT || 3001),
   SUPABASE_URL: process.env.SUPABASE_URL,
@@ -38,13 +38,22 @@ const env = {
   AUDIT_LOG_ENABLED: String(process.env.AUDIT_LOG_ENABLED || "true").toLowerCase() !== "false",
   AUDIT_LOG_RETENTION_DAYS: Number(process.env.AUDIT_LOG_RETENTION_DAYS || 90),
   ENVIRONMENT: process.env.NODE_ENV || "development",
+  // Email/SMTP Configuration
+  SMTP_HOST: process.env.SMTP_HOST || "",
+  SMTP_PORT: Number(process.env.SMTP_PORT || 587),
+  SMTP_USER: process.env.SMTP_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || "",
+  SMTP_FROM_EMAIL: process.env.SMTP_FROM_EMAIL || "noreply@jobsearchhub.local",
+  SMTP_FROM_NAME: process.env.SMTP_FROM_NAME || "Job Search Hub",
+  SMTP_SECURE: String(process.env.SMTP_SECURE || "true").toLowerCase() === "true",
+  OTP_SEND_MODE: process.env.OTP_SEND_MODE || "email", // "email" or "console" for dev
 };
 
 const requiredEnvironmentVariables = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "REDIRECT_URI",
-  "ANTHROPIC_API_KEY",
+  "GEMINI_API_KEY",
 ];
 
 const missingVariables = requiredEnvironmentVariables.filter(

@@ -30,7 +30,7 @@ const router = express.Router();
  */
 router.post('/request-otp', requireUserAuth, async (req, res) => {
   const { email } = req.body;
-  const userId = req.user.id;
+  const userId = req.authUser.id;
   const ipAddress = getClientIP(req);
   const userAgent = getUserAgent(req);
 
@@ -45,7 +45,7 @@ router.post('/request-otp', requireUserAuth, async (req, res) => {
   }
 
   try {
-    const result = await requestOTP(req.db, userId, email, ipAddress, userAgent);
+    const result = await requestOTP(userId, email, req.authUser.name || 'User', ipAddress, userAgent);
     
     if (result.error) {
       const statusCode = result.error.code === 'RATE_LIMITED' ? 429 : 400;
@@ -76,7 +76,7 @@ router.post('/request-otp', requireUserAuth, async (req, res) => {
  */
 router.post('/verify-otp', requireUserAuth, async (req, res) => {
   const { code } = req.body;
-  const userId = req.user.id;
+  const userId = req.authUser.id;
   const ipAddress = getClientIP(req);
   const userAgent = getUserAgent(req);
 
@@ -91,7 +91,7 @@ router.post('/verify-otp', requireUserAuth, async (req, res) => {
   }
 
   try {
-    const result = await verifyOTP(req.db, userId, code, ipAddress, userAgent);
+    const result = await verifyOTP(userId, code, ipAddress, userAgent);
 
     if (result.error) {
       const statusCode = result.error.code === 'ACCOUNT_LOCKED' ? 429 : 400;
@@ -99,7 +99,7 @@ router.post('/verify-otp', requireUserAuth, async (req, res) => {
     }
 
     // OTP verified — generate verification link for next step
-    const linkResult = await generateVerificationLink(req.db, userId, req.user.email, ipAddress, userAgent);
+    const linkResult = await generateVerificationLink(userId, req.authUser.email, ipAddress, userAgent);
 
     return res.status(200).json({
       success: true,
@@ -129,7 +129,7 @@ router.post('/verify-otp', requireUserAuth, async (req, res) => {
  */
 router.post('/verify-email', requireUserAuth, async (req, res) => {
   const { token } = req.body;
-  const userId = req.user.id;
+  const userId = req.authUser.id;
   const ipAddress = getClientIP(req);
   const userAgent = getUserAgent(req);
 
@@ -144,7 +144,7 @@ router.post('/verify-email', requireUserAuth, async (req, res) => {
   }
 
   try {
-    const result = await verifyEmailToken(req.db, userId, token, ipAddress, userAgent);
+    const result = await verifyEmailToken(userId, token, ipAddress, userAgent);
 
     if (result.error) {
       return res.status(400).json(result);
@@ -168,10 +168,10 @@ router.post('/verify-email', requireUserAuth, async (req, res) => {
  * Returns OTP verification state and extraction enabled state
  */
 router.get('/status', requireUserAuth, async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.authUser.id;
 
   try {
-    const result = await getExtractionStatus(req.db, userId);
+    const result = await getExtractionStatus(userId);
 
     if (result.error) {
       return res.status(404).json(result);
@@ -195,11 +195,11 @@ router.get('/status', requireUserAuth, async (req, res) => {
  * Query params: limit (default 50)
  */
 router.get('/audit-log', requireUserAuth, async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.authUser.id;
   const limit = Math.min(parseInt(req.query.limit) || 50, 100);
 
   try {
-    const result = await getAuditLog(req.db, userId, limit);
+    const result = await getAuditLog(userId, limit);
 
     if (result.error) {
       return res.status(500).json(result);
