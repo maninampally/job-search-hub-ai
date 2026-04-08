@@ -117,6 +117,20 @@ export async function disconnectGmail() {
 	return parseResponse(response);
 }
 
+export async function getGoogleAuthUrl() {
+	const response = await apiFetch(`${BACKEND_URL}/auth/google-auth-url`);
+	return parseResponse(response);
+}
+
+export async function authenticateWithGoogle(code) {
+	const response = await apiFetch(`${BACKEND_URL}/auth/google-auth`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ code }),
+	});
+	return parseResponse(response);
+}
+
 export async function getJobs() {
 	const response = await apiFetch(`${BACKEND_URL}/jobs`);
 	return parseResponse(response);
