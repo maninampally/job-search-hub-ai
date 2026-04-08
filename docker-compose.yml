@@ -15,7 +15,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       REDIRECT_URI: ${REDIRECT_URI}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       EXTERNAL_API_TIMEOUT_MS: ${EXTERNAL_API_TIMEOUT_MS:-12000}
@@ -26,6 +26,15 @@ services:
       INITIAL_SYNC_MAX_MESSAGES: ${INITIAL_SYNC_MAX_MESSAGES:-1000}
       SYNC_CRON: ${SYNC_CRON:-0 9 * * *}
       SYNC_PROCESSING_CONCURRENCY: ${SYNC_PROCESSING_CONCURRENCY:-1}
+      # Email Configuration
+      OTP_SEND_MODE: ${OTP_SEND_MODE:-console}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@jobsearchhub.local}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Job Search Hub}
     volumes:
       - server_data:/app/server/data
     healthcheck:
@@ -40,7 +49,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_BACKEND_URL: http://backend:3001
+        VITE_BACKEND_URL: http://localhost:3001
     depends_on:
       backend:
         condition: service_healthy
