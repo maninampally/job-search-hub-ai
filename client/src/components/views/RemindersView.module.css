@@ -1,0 +1,481 @@
+/* RemindersView.module.css */
+
+.page {
+  padding: 24px;
+  background: #f8f8f7;
+  min-height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.headerLeft h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.headerLeft p {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.primaryButton {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.secondaryButton {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stats Row */
+.statsRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.statCard {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.statIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #ffffff;
+}
+
+.statIconRed { background: #ef4444; }
+.statIconYellow { background: #f59e0b; }
+.statIconBlue { background: #2563eb; }
+.statIconGreen { background: #10b981; }
+
+.statInfo {
+  flex: 1;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Filters */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  flex: 1;
+  max-width: 300px;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.filterSelect {
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.toggleFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.toggleFilter:hover {
+  background: #f9fafb;
+}
+
+.toggleFilter.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+/* Form Card */
+.formCard {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.formTitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.formGrid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.formGroup {
+  flex: 1;
+  min-width: 150px;
+}
+
+.formInput,
+.formSelect {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.formInput:focus,
+.formSelect:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.formSubmit {
+  padding: 10px 20px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.formSubmit:hover {
+  background: #1d4ed8;
+}
+
+/* Reminders List */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Reminder Card */
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.15s ease;
+}
+
+.card:hover {
+  border-color: #d1d5db;
+}
+
+.card.overdue {
+  border-left: 3px solid #ef4444;
+  background: #fef2f2;
+}
+
+.card.completed {
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+.checkbox {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.15s ease;
+}
+
+.checkbox:hover {
+  border-color: #2563eb;
+}
+
+.checkbox.checked {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.cardContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.card.completed .cardTitle {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dueDate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.dueDate.overdue {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.typeBadge {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.typeFollowUp { background: #dbeafe; color: #1d4ed8; }
+.typeDeadline { background: #fee2e2; color: #dc2626; }
+.typeInterview { background: #fef3c7; color: #d97706; }
+.typeOther { background: #f3f4f6; color: #6b7280; }
+
+.overdueBadge {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #ef4444;
+  color: #ffffff;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.completedBadge {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.cardActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.deleteButton {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #dc2626;
+  background: transparent;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  background: #fef2f2;
+}
+
+/* Empty State */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.emptyIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #d1fae5;
+  border-radius: 50%;
+  margin-bottom: 16px;
+  color: #10b981;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.emptyText {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Alert Messages */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.alertSuccess {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.alertError {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .statsRow {
+    flex-direction: column;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInput {
+    max-width: none;
+  }
+
+  .formGrid {
+    flex-direction: column;
+  }
+
+  .card {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cardActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
