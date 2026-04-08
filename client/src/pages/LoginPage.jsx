@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { getGoogleAuthUrl, authenticateWithGoogle } from "../api/backend";
+import { BACKEND_URL } from "../api/backend";
 
 export default function LoginPage() {
-  const { isAuthenticated, login, register, refreshUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const { isAuthenticated, login, register } = useAuth();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -20,48 +19,16 @@ export default function LoginPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Handle Google OAuth callback
-  useEffect(() => {
-    const code = searchParams.get("code");
-    if (!code) return;
-
-    async function handleGoogleCallback() {
-      try {
-        setGoogleLoading(true);
-        const result = await authenticateWithGoogle(code);
-        if (result.token) {
-          // Store token and refresh user context
-          localStorage.setItem("jsh_auth_token", result.token);
-          await refreshUser();
-          // Remove code from URL
-          window.history.replaceState({}, document.title, "/login");
-        }
-      } catch (err) {
-        setError(err.message || "Google authentication failed");
-        setGoogleLoading(false);
-      }
-    }
-
-    handleGoogleCallback();
-  }, [searchParams, refreshUser]);
-
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  async function handleGoogleSignIn() {
-    try {
-      setGoogleLoading(true);
-      setError("");
-      const result = await getGoogleAuthUrl();
-      if (result.authUrl) {
-        // Redirect to Google OAuth
-        window.location.href = result.authUrl;
-      }
-    } catch (err) {
-      setError(err.message || "Unable to start Google login");
-      setGoogleLoading(false);
-    }
+  function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    setError("");
+    // Pattern B: direct redirect to backend OAuth endpoint
+    // Backend stores auth user in session, handles PKCE + CSRF state, redirects to dashboard on success
+    window.location.href = `${BACKEND_URL}/auth/gmail`;
   }
 
   async function handleSubmit(event) {

@@ -93,79 +93,33 @@ Verify builds:
 docker images | grep job-search-hub
 ```
 
-### Step 5: Deploy to Production
-
-Choose your deployment platform:
-
-#### Option A: Deploy to Railway
+### Step 5: Run Locally with Docker
 
 ```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Link project
-railway link
-
-# Deploy
-railway up
-```
-
-#### Option B: Deploy to Render
-
-1. Push your code to GitHub
-2. Go to [render.com](https://render.com)
-3. Create new Web Service
-4. Connect your GitHub repo
-5. Set environment variables
-6. Deploy
-
-#### Option C: Deploy to DigitalOcean App Platform
-
-1. Push to GitHub
-2. Go to DigitalOcean → Apps
-3. Click "Create App"
-4. Connect GitHub repo
-5. Add environment variables
-6. Deploy
-
-#### Option D: Deploy to VPS (self-hosted)
-
-```bash
-# SSH into your server
-ssh user@your-server.com
-
-# Clone repo
-git clone <your-repo-url>
-cd job-search-hub
-
-# Copy .env
-cp .env.production .env
-
-# Build and run with Docker
+# Ensure .env exists at project root
 docker compose up -d
 
-# Or with systemd
-sudo systemctl start job-search-hub
+# View logs
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Stop containers
+docker compose down
 ```
 
-### Step 6: Verify Production Deployment
-
+Verify it's running:
 ```bash
-# Health check
-curl https://yourdomain.com/health
-
-# Check API response
-curl https://yourdomain.com/api/jobs
-
-# View audit logs
-ssh user@your-server.com
-tail -f server/data/audit-logs/audit-*.log
+curl http://localhost:3001/health
+# Expected: {"status":"ok","version":"1.0.0"}
 ```
 
-## Security Features Enabled in Production
+## Local Development URLs
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
+- Health Check: http://localhost:3001/health
+
+## Production Deployment Notes
 
 ### 1. Data Loss Prevention (DLP)
 - Email bodies sanitized before Claude API calls
@@ -213,113 +167,79 @@ cat server/data/audit-logs/audit-$(date +%Y-%m-%d).log | jq .
 # Monitor sync errors
 grep "SYNC_ERROR" server/data/audit-logs/audit-*.log
 
-# Watch rate limit breaches
-grep "RATE_LIMIT" server/data/audit-logs/audit-*.log
-```
+## Security Features
 
-### 4. Test Email Sync
+The application includes several built-in security features:
 
-1. Log in to production app
-2. Create a test Gmail account
-3. Connect Gmail via OAuth
-4. Trigger sync manually
-5. Verify 3-sync/hour rate limit works
-6. Check audit logs
+### 1. Email Verification
+- New users must verify email before accessing dashboard
+- Google OAuth auto-verifies email (Google already verified it)
+- Verification tokens expire after 24 hours
 
-### 5. Set Up Monitoring
+### 2. Environment Variables
+- All secrets stored in `.env` (never committed to Git)
+- API keys: Anthropic, Google OAuth, Supabase
+- Session secrets for authentication
 
-- Enable error tracking (Sentry, Rollbar)
-- Set up performance monitoring (New Relic, DataDog)
-- Monitor API response times
-- Alert on rate limit breaches
+### 3. Password Security
+- Passwords hashed with bcrypt
+- Minimum 8 characters required
+- Password confirmation on registration
 
-### 6. First-Time Setup
+### 4. OAuth Token Management
+- Google tokens stored securely in Supabase
+- Encrypted before storage for sensitive data
+- Only accessible to authenticated users
 
-1. Create admin user account
-2. Configure SMTP for email notifications
-3. Test backup/restore process
-4. Document operational procedures
+## Development Notes
 
-## Rollback Procedure
+- Logs available via `docker compose logs backend`
+- Data persisted in Docker volumes
+- Supabase provides cloud database backup
+- All authentication events logged
 
-If deployment fails:
+## Common Commands
 
 ```bash
-# Docker
+# Start everything
+docker compose up -d
+
+# View backend logs
+docker compose logs -f backend
+
+# View frontend logs
+docker compose logs -f frontend
+
+# Stop all services
 docker compose down
-docker compose up -d  # Previous version
 
-# Railway
-railway rollback
-
-# Render
-Go to Deployments → Previous deployment → Activate
+# Clean up volumes (resets data)
+docker compose down -v
 ```
 
 ## Troubleshooting
 
-### Sync Not Working
+### Google OAuth Not Working
+- Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
+- Ensure `REDIRECT_URI=http://localhost:3001/auth/callback` matches Google Console
 
-```bash
-# Check oauth_tokens table
-SELECT * FROM oauth_tokens WHERE owner_user_id = 'user_id';
+### Email Not Sending
+- Check `SMTP_HOST` and `SMTP_PORT` configuration
+- Verify Resend API key is valid
+- Check backend logs: `docker compose logs backend | grep -i email`
 
-# Check token is encrypted
-SELECT content->'tokens'->0->>'access_token' from oauth_tokens;
-# Should show {iv, encryptedData, authTag} not plaintext
+### Frontend Not Loading
+- Ensure frontend is running: `docker compose ps`
+- Check `VITE_BACKEND_URL` is set correctly
+- Clear browser cache and hard refresh
 
-# Check rate limit
-curl -X POST https://yourdomain.com/jobs/sync \
-  -H "Authorization: Bearer token"
-# Should return rate limit headers in response
-```
+## Next Steps
 
-### SSL Certificate Issues
-
-```bash
-# Renew Let's Encrypt certificate
-sudo certbot renew --force-renewal
-
-# Check certificate expiry
-openssl s_client -connect yourdomain.com:443 -dates
-```
-
-### High Memory Usage
-
-Check for sync hanging:
-
-```bash
-grep "SYNC" server/data/audit-logs/audit-*.log | grep -v "SYNC_COMPLETED"
-# Kill stuck process and restart
-docker compose restart api
-```
-
-## Security Considerations
-
-1. **NEVER commit .env file** — .env is in .gitignore for safety
-2. **Use strong passwords** — All secrets should be 32+ bytes
-3. **Rotate keys periodically** — TOKEN_ENCRYPTION_KEY should be rotated quarterly
-4. **Monitor audit logs** — Review for suspicious activity daily
-5. **Keep deps updated** — Run `npm audit` monthly
-6. **Use VPN for admin access** — Restrict admin panel access to known IPs
-7. **Enable 2FA** — Use 2FA for Google OAuth and database access
-
-## Performance Optimization
-
-- Email sync runs at 9 AM UTC daily (configurable via SYNC_CRON)
-- Max 3 syncs/user/hour to prevent API throttling
-- Claude API calls include retry logic with exponential backoff
-- Database uses connection pooling for optimal performance
-
-## Support & Documentation
-
-- **Bug Reports**: Create issue on GitHub
-- **Security Issues**: Email security@yourdomain.com (don't use GitHub issues)
-- **API Docs**: See `server/src/routes/` for endpoint documentation
-- **Database Schema**: See `docs/database/schema.sql`
+- Run `docker compose up --build` to start development
+- Visit http://localhost:5173 to access the app
+- See docs/DEPLOYMENT.md for Google OAuth setup instructions
 
 ---
 
-**Last Updated**: 2026-04-05
-**Version**: 1.0.0 (Production Ready)
-**Security Status**: ✅ Fully Hardened
+**Last Updated**: 2026-04-07
+**Version**: 1.0.0 (Local Development)

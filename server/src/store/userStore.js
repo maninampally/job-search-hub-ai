@@ -379,6 +379,293 @@ function isEmailVerified(user) {
   return user?.email_verified_at !== null && user?.email_verified_at !== undefined;
 }
 
+// ============================================================================
+// SESSION HELPERS (refresh token sessions in user_sessions table)
+// ============================================================================
+
+/**
+ * Helper: detect when user_sessions table doesn't exist yet
+ * so we can fail gracefully instead of crashing.
+ */
+function isMissingSessionsTableError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("user_sessions") &&
+    (
+      message.includes("does not exist") ||
+      message.includes("not found") ||
+      message.includes("could not find the table") ||
+      message.includes("relation") ||
+      message.includes("undefined")
+    )
+  );
+}
+
+/**
+ * Insert a new session row into user_sessions.
+ * Gracefully returns null if the table doesn't exist yet.
+ */
+async function createSession(userId, tokenHash, deviceFingerprint, ipAddress, userAgent, expiresAt) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from("user_sessions").insert([{
+      user_id: userId,
+      token_hash: tokenHash,
+      device_fingerprint: deviceFingerprint || null,
+      ip_address: ipAddress || null,
+      user_agent: userAgent || null,
+      expires_at: expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt,
+      last_active: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    }]).select("*").single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - session not stored (run migration 010_user_sessions.sql)");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Look up a session by token hash that hasn't expired.
+ * Returns null if not found or table missing.
+ */
+async function getSessionByHash(tokenHash) {
+  if (!supabase || !tokenHash) return null;
+  try {
+    const { data, error } = await supabase
+      .from("user_sessions")
+      .select("*")
+      .eq("token_hash", tokenHash)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - cannot look up session");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete a specific session by id.
+ * Gracefully no-ops if table missing.
+ */
+async function deleteSession(sessionId) {
+  if (!supabase || !sessionId) return null;
+  try {
+    const { error } = await supabase
+      .from("user_sessions")
+      .delete()
+      .eq("id", sessionId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - cannot delete session");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete all sessions for a user (used on logout-all or theft detection).
+ * Gracefully no-ops if table missing.
+ */
+async function deleteAllUserSessions(userId) {
+  if (!supabase || !userId) return null;
+  try {
+    const { error } = await supabase
+      .from("user_sessions")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - cannot delete sessions");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete all sessions for a user EXCEPT the current one.
+ * Used for "end all other sessions" feature.
+ */
+async function deleteOtherSessions(userId, currentSessionId) {
+  if (!supabase || !userId) return null;
+  try {
+    let q = supabase
+      .from("user_sessions")
+      .delete()
+      .eq("user_id", userId);
+
+    if (currentSessionId) {
+      q = q.neq("id", currentSessionId);
+    }
+
+    const { error } = await q;
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - cannot delete other sessions");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * List all active sessions for a user (non-expired).
+ * Returns empty array if table missing.
+ */
+async function listUserSessions(userId) {
+  if (!supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("user_sessions")
+      .select("id, user_id, device_fingerprint, ip_address, user_agent, last_active, expires_at, created_at")
+      .eq("user_id", userId)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    if (isMissingSessionsTableError(error)) {
+      console.warn("[userStore] user_sessions table not found - cannot list sessions");
+      return [];
+    }
+    throw error;
+  }
+}
+
+// ============================================================================
+// MFA CONFIG HELPERS
+// ============================================================================
+
+/**
+ * Get MFA config for a user
+ * Returns: { totp_secret, totp_enabled, backup_codes, enrolled_at } or null
+ */
+async function getMFAConfig(userId) {
+  // Try Supabase first
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('mfa_config')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (data) {
+        return {
+          totp_secret: data.totp_secret,
+          totp_enabled: data.totp_enabled,
+          backup_codes: data.backup_codes ? JSON.parse(data.backup_codes) : [],
+          enrolled_at: data.enrolled_at,
+        };
+      }
+
+      if (error?.code !== 'PGRST116') {
+        // Not "no rows" error
+        throw error;
+      }
+    } catch (error) {
+      console.warn('[userStore] mfa_config table lookup failed:', error.message);
+    }
+  }
+
+  // Fallback to local store
+  const user = localFindById(userId);
+  if (user?.mfa_config) {
+    return user.mfa_config;
+  }
+
+  return null;
+}
+
+/**
+ * Save or update MFA config for a user
+ */
+async function saveMFAConfig(userId, { totp_secret, totp_enabled, backup_codes, enrolled_at }) {
+  // Try Supabase first
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('mfa_config')
+        .upsert({
+          user_id: userId,
+          totp_secret,
+          totp_enabled: Boolean(totp_enabled),
+          backup_codes: backup_codes ? JSON.stringify(backup_codes) : null,
+          enrolled_at: enrolled_at || new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return;
+    } catch (error) {
+      console.warn('[userStore] mfa_config save failed:', error.message);
+    }
+  }
+
+  // Fallback to local store
+  const index = localStore.users.findIndex((u) => u.id === userId);
+  if (index >= 0) {
+    localStore.users[index].mfa_config = {
+      totp_secret,
+      totp_enabled: Boolean(totp_enabled),
+      backup_codes: backup_codes || [],
+      enrolled_at: enrolled_at || new Date().toISOString(),
+    };
+    saveLocalStore(localStore);
+  }
+}
+
+/**
+ * Disable MFA for a user
+ */
+async function disableMFA(userId) {
+  // Try Supabase first
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('mfa_config')
+        .update({ totp_enabled: false })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return;
+    } catch (error) {
+      console.warn('[userStore] mfa disable failed:', error.message);
+    }
+  }
+
+  // Fallback to local store
+  const index = localStore.users.findIndex((u) => u.id === userId);
+  if (index >= 0) {
+    if (localStore.users[index].mfa_config) {
+      localStore.users[index].mfa_config.totp_enabled = false;
+      saveLocalStore(localStore);
+    }
+  }
+}
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -392,4 +679,15 @@ module.exports = {
   updateUserVerification,
   setEmailVerificationTokenHash,
   isEmailVerified,
+  // Session helpers
+  createSession,
+  getSessionByHash,
+  deleteSession,
+  deleteAllUserSessions,
+  deleteOtherSessions,
+  listUserSessions,
+  // MFA helpers
+  getMFAConfig,
+  saveMFAConfig,
+  disableMFA,
 };
