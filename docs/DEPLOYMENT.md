@@ -1,61 +1,88 @@
-# Deployment Guide
+# Local Development Setup Guide
 
-## Step 1 — Google Cloud (10 mins)
-1. console.cloud.google.com > New Project "Job Search Hub"
-2. APIs & Services > Enable Gmail API
-3. Credentials > Create OAuth 2.0 Client ID > Web application
-4. Authorized redirect URI: https://YOUR-RAILWAY-APP.up.railway.app/auth/callback
-5. Copy Client ID and Client Secret
-6. OAuth consent screen > Add your Gmail as test user
+## Step 1 — Google Cloud OAuth Setup
 
-## Step 2 — Railway (5 mins)
-1. railway.app > New Project > Empty Project
-2. Add Service > Upload the repository
-3. Set Start Command to: node server/index.js
-4. Settings > Networking > Generate Domain
-5. Copy your domain and update Google Cloud redirect URI
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project: "Job Search Hub"
+3. Enable these APIs:
+   - Gmail API
+   - Google+ API
+4. Go to **Credentials > Create OAuth 2.0 Client ID > Web application**
+5. Add Authorized redirect URI: `http://localhost:3001/auth/callback`
+6. Copy the **Client ID** and **Client Secret**
+7. Go to **OAuth consent screen** and add your Gmail as a test user
 
-## Step 3 — Environment Variables in Railway
-Add these in your Railway project > Variables tab:
+## Step 2 — Anthropic API Key
 
-Required:
-  GOOGLE_CLIENT_ID     = from Google Cloud
-  GOOGLE_CLIENT_SECRET = from Google Cloud
-  REDIRECT_URI         = https://YOUR-APP.railway.app/auth/callback
-  ANTHROPIC_API_KEY    = from console.anthropic.com
-  FRONTEND_URL         = your frontend URL
-  PORT                 = 3001
-  CORS_ALLOWED_ORIGINS = your frontend URL
-  EXTERNAL_API_TIMEOUT_MS = 12000
-  RETRY_ATTEMPTS       = 2
-  NODE_ENV             = production
+1. Visit [console.anthropic.com](https://console.anthropic.com)
+2. Create an API key for Claude AI
+3. Copy the key
 
-Optional (recommended for persistent production storage):
-  SUPABASE_URL               = from Supabase project settings
-  SUPABASE_SERVICE_ROLE_KEY  = from Supabase project settings
+## Step 3 — Environment Variables
 
-## Step 4 — Update Frontend
-Set your frontend backend URL to the Railway API domain with `VITE_BACKEND_URL`.
+Create a `.env` file at the project root:
 
-Important:
-- `VITE_BACKEND_URL` is build-time for Vite. Set it before frontend image/build runs.
-- If using Docker compose build args, pass `VITE_BACKEND_URL` into the frontend build stage.
+```bash
+cp .env.example .env
+```
 
-## Step 5 — Connect Gmail
-1. Open the Job Search Hub app
-2. Dashboard > Gmail Auto Sync > Connect Gmail
-3. Authorize read-only access on Google login page
-4. Redirected back — "Gmail connected!" appears
-5. Emails now sync automatically every 5 minutes
+Fill in the required variables:
+
+```env
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+REDIRECT_URI=http://localhost:3001/auth/callback
+ANTHROPIC_API_KEY=your_anthropic_api_key
+FRONTEND_URL=http://localhost:5173
+PORT=3001
+```
+
+Optional but recommended:
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_USER=your_resend_api_key
+MAIL_FROM=noreply@yourdomain.com
+```
+
+## Step 4 — Run Locally with Docker
+
+```bash
+cd job-search-hub
+docker compose up --build
+```
+
+App URLs:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
+- Health Check: http://localhost:3001/health
+
+## Step 5 — Connect Gmail (First Login)
+
+1. Open http://localhost:5173
+2. Click "🔐 Continue with Google"
+3. Authorize the app to access your Gmail
+4. Email automatically verified by Google
+5. Dashboard available immediately
+
+## Step 6 — Stop Development Server
+
+```bash
+docker compose down
+```
 
 ## Verify It Works
-Visit https://YOUR-APP.railway.app/health
-Expected response: {"status":"ok","version":"1.0.0"}
 
-Visit https://YOUR-APP.railway.app/auth/status
-Expected response before Gmail connect: {"connected":false,"lastChecked":null}
+```bash
+# Health check
+curl http://localhost:3001/health
 
-After connecting Gmail:
-- `connected` should become `true`
-- Trigger Sync Jobs from frontend
-- Visit `/jobs` to verify extracted job objects
+# API status
+curl http://localhost:3001/auth/status
+```
+
+Expected responses:
+- `/health`: `{"status":"ok","version":"1.0.0"}`
+- `/auth/status`: User authentication status

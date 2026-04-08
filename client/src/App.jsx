@@ -4,8 +4,10 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { useAuth } from "./auth/AuthContext";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
+import { BillingPage } from "./components/views/BillingPage";
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, requireVerified = true }) {
   const { isAuthenticated, isInitializing, user } = useAuth();
 
   if (isInitializing) {
@@ -16,9 +18,26 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // NEW: Enforce email verification before accessing dashboard
-  if (!user?.is_email_verified) {
+  if (requireVerified && !user?.is_email_verified) {
     return <Navigate to="/verify-email" replace />;
+  }
+
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const { isAuthenticated, isInitializing, user } = useAuth();
+
+  if (isInitializing) {
+    return <div className="auth-loading">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -45,35 +64,51 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="/login"
-          element={(
+          element={
             <PublicOnlyRoute>
               <LoginPage />
             </PublicOnlyRoute>
-          )}
+          }
         />
         <Route
           path="/verify-email"
-          element={(
-            <ProtectedRoute>
+          element={
+            <ProtectedRoute requireVerified={false}>
               <VerifyEmailPage />
             </ProtectedRoute>
-          )}
+          }
         />
         <Route
           path="/profile"
-          element={(
+          element={
             <ProtectedRoute>
               <ProfilePage />
             </ProtectedRoute>
-          )}
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute>
+              <BillingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
         />
         <Route
           path="/:route/*"
-          element={(
+          element={
             <ProtectedRoute>
               <DashboardWrapper />
             </ProtectedRoute>
-          )}
+          }
         />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

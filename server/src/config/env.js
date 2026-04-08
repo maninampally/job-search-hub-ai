@@ -47,6 +47,13 @@ const env = {
   SMTP_FROM_NAME: process.env.SMTP_FROM_NAME || "Job Search Hub",
   SMTP_SECURE: String(process.env.SMTP_SECURE || "true").toLowerCase() === "true",
   OTP_SEND_MODE: process.env.OTP_SEND_MODE || "email", // "email" or "console" for dev
+  // Admin IP allowlist (comma-separated IPs). Empty string means allow all IPs.
+  ADMIN_IP_ALLOWLIST: process.env.ADMIN_IP_ALLOWLIST || "",
+  // Stripe billing keys
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || "",
+  STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO || "",
+  STRIPE_PRICE_ELITE: process.env.STRIPE_PRICE_ELITE || "",
 };
 
 const requiredEnvironmentVariables = [

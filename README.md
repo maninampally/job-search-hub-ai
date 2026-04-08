@@ -34,9 +34,6 @@ npm --prefix client install
 npm run dev:client
 ```
 
-### Deploy to Railway
-See docs/DEPLOYMENT.md for full step by step guide.
-
 ### Run with Docker
 ```bash
 # Ensure .env exists at project root
@@ -60,9 +57,11 @@ docker compose down
 ## Tech Stack
 - Frontend: React (organized under client/)
 - Backend: Node.js + Express
+- Database: Supabase (PostgreSQL)
 - Gmail: Google OAuth2 + Gmail API
 - AI: Claude claude-sonnet-4 (Anthropic)
-- Hosting: Railway (free tier)
+- Email: Resend SMTP
+- Containerization: Docker & Docker Compose
 
 ## Environment Variables
 Required (server):
@@ -91,6 +90,7 @@ See `.env.example` for sample values.
 ## Documentation
 - docs/DEPLOYMENT.md
 - docs/ARCHITECTURE.md
+- PROJECT_DOCUMENTATION.md (complete end-to-end documentation)
 
 ## Production Verification
 - `GET /health` should return `{"status":"ok","version":"1.0.0"}`

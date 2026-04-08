@@ -14,6 +14,22 @@ export function VerifyEmailPage() {
   const [error, setError] = useState("");
   const [token, setToken] = useState(searchParams.get("token") || "");
   const [autoSentEmail, setAutoSentEmail] = useState(false);
+  const [devVerifyUrl, setDevVerifyUrl] = useState("");
+  const [devEmailSent, setDevEmailSent] = useState(null);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      navigate("/login", { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  // Redirect if already verified
+  useEffect(() => {
+    if (user?.is_email_verified || user?.email_verified_at) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user?.is_email_verified, user?.email_verified_at, navigate]);
 
   // Auto-verify if token in URL
   useEffect(() => {
@@ -49,7 +65,7 @@ export function VerifyEmailPage() {
 
   // Auto-send verification email on first page load (if no token and email not verified)
   useEffect(() => {
-    if (token || autoSentEmail || user?.email_verified_at) {
+    if (token || autoSentEmail || user?.is_email_verified || user?.email_verified_at) {
       return;
     }
 
@@ -61,6 +77,10 @@ export function VerifyEmailPage() {
         
         if (result.success) {
           setMessage(result.message || `Verification email sent to ${user?.email}`);
+          if (result.devVerifyUrl) {
+            setDevVerifyUrl(result.devVerifyUrl);
+            setDevEmailSent(result.devEmailSent ?? null);
+          }
           setStatus("idle");
         }
       } catch (err) {
@@ -82,6 +102,10 @@ export function VerifyEmailPage() {
       
       if (result.success) {
         setMessage(result.message || `Verification email sent to ${user?.email}`);
+        if (result.devVerifyUrl) {
+          setDevVerifyUrl(result.devVerifyUrl);
+          setDevEmailSent(result.devEmailSent ?? null);
+        }
         setTimeout(() => {
           setStatus("idle");
         }, 5000);
@@ -90,20 +114,6 @@ export function VerifyEmailPage() {
       setStatus("idle");
       setError(err.message || "Failed to send verification email");
     }
-  }
-
-  // Redirect if already verified
-  if (user?.email_verified_at) {
-    useEffect(() => {
-      navigate("/dashboard");
-    }, []);
-  }
-
-  // Redirect if not authenticated
-  if (!isAuthenticated || !user) {
-    useEffect(() => {
-      navigate("/login");
-    }, []);
   }
 
   if (status === "success") {
@@ -173,6 +183,32 @@ export function VerifyEmailPage() {
               }}
             >
               {message}
+            </div>
+          )}
+
+          {devVerifyUrl && (
+            <div
+              style={{
+                padding: "12px",
+                backgroundColor: "#eef6ff",
+                color: "#0b5ed7",
+                borderRadius: "4px",
+                marginBottom: "1rem",
+                fontSize: "14px",
+                lineHeight: "1.5",
+              }}
+            >
+              <p style={{ margin: 0, marginBottom: "8px" }}>
+                <strong>Dev shortcut:</strong> SMTP may not be configured. Use this link to verify now.
+              </p>
+              {devEmailSent === false && (
+                <p style={{ margin: 0, marginBottom: "8px" }}>
+                  Email was not sent by server. This link will still work.
+                </p>
+              )}
+              <a href={devVerifyUrl} style={{ wordBreak: "break-all" }}>
+                {devVerifyUrl}
+              </a>
             </div>
           )}
 
