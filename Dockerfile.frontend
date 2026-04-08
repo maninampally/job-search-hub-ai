@@ -5,12 +5,12 @@ WORKDIR /app
 COPY package*.json ./
 COPY client ./client
 
-RUN npm --prefix client install
+RUN cd client && rm -rf node_modules package-lock.json && npm install --legacy-peer-deps
 
 ARG VITE_BACKEND_URL=http://localhost:3001
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 
-RUN npm --prefix client run build
+RUN cd client && npm run build
 
 FROM node:20-alpine AS runner
 
