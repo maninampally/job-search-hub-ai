@@ -336,12 +336,23 @@ async function updateUserVerification(userId, options = {}) {
 async function setEmailVerificationTokenHash(userId, tokenHash, sentAt = new Date()) {
   return withSupabaseFallback(
     async () => {
+      // First get current user to increment attempts
+      const { data: userData, error: getError } = await supabase
+        .from("app_users")
+        .select("email_verification_attempts")
+        .eq("id", userId)
+        .single();
+      
+      if (getError) throw getError;
+      
+      const currentAttempts = userData?.email_verification_attempts || 0;
+      
       const { data, error } = await supabase
         .from("app_users")
         .update({
           email_verification_token_hash: tokenHash,
           email_verification_sent_at: sentAt.toISOString(),
-          email_verification_attempts: supabase.raw("COALESCE(email_verification_attempts, 0) + 1"),
+          email_verification_attempts: currentAttempts + 1,
           updated_at: new Date().toISOString()
         })
         .eq("id", userId)
