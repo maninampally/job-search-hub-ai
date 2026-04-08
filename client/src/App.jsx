@@ -6,7 +6,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { useAuth } from "./auth/AuthContext";
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { isAuthenticated, isInitializing, user } = useAuth();
 
   if (isInitializing) {
     return <div className="auth-loading">Loading your workspace...</div>;
@@ -14,6 +14,11 @@ function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // NEW: Enforce email verification before accessing dashboard
+  if (!user?.is_email_verified) {
+    return <Navigate to="/verify-email" replace />;
   }
 
   return children;
