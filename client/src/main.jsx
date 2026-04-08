@@ -1,23 +1,29 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import "./styles/tokens.css";
 import "./styles/app.css";
 
-// Handle unhandled promise rejections gracefully
-window.addEventListener("unhandledrejection", (event) => {
-  // Only log non-extension-related errors
-  if (event.reason?.message && !event.reason.message.includes("message channel")) {
-    console.error("Unhandled promise rejection:", event.reason);
-  }
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000, // 30 seconds
+      retry: 1,
+    },
+  },
 });
 
-// Suppress known extension-related errors from console
+// Suppress known browser-extension errors from polluting the console
 const originalError = console.error;
 console.error = function (...args) {
   const message = String(args[0] || "");
-  // Suppress known extension errors
-  if (message.includes("checkSupportDomain") || message.includes("message channel closed")) {
+  if (
+    message.includes("checkSupportDomain") ||
+    message.includes("message channel closed") ||
+    message.includes("ResizeObserver loop")
+  ) {
     return;
   }
   originalError.apply(console, args);
@@ -25,8 +31,10 @@ console.error = function (...args) {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </QueryClientProvider>
   </React.StrictMode>
 );

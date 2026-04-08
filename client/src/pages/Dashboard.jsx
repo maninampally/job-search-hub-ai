@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
+  MdDashboard, MdWork, MdDescription, MdPeople, MdEmail, MdPsychology,
+  MdCampaign, MdNotifications, MdSearch, MdPerson, MdLogout,
+} from "react-icons/md";
+import {
   BACKEND_URL,
   createContact,
   disconnectGmail,
@@ -33,10 +37,24 @@ import { useContactActions, normalizeContactForUI } from "../hooks/useContactAct
 import { useOutreachActions, normalizeOutreachForUI } from "../hooks/useOutreachActions";
 import { useReminderActions } from "../hooks/useReminderActions";
 import { useTemplateActions } from "../hooks/useTemplateActions";
+import { CommandPalette } from "../components/layout/CommandPalette";
+import { MobileTabBar } from "../components/layout/MobileTabBar";
+import { useUIStore } from "../stores/uiStore";
 
 const PIPELINE_ORDER = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"];
 const EMAIL_READ_STORAGE_KEY = "jsa_v2";
 const INTERVIEW_STORAGE_KEY = "jsh_interview_answers_v1";
+
+const NAV_ICONS = {
+  "Dashboard":      <MdDashboard size={17} />,
+  "Job Tracker":    <MdWork size={17} />,
+  "Resume Manager": <MdDescription size={17} />,
+  "Contacts":       <MdPeople size={17} />,
+  "Templates":      <MdEmail size={17} />,
+  "Interview Prep": <MdPsychology size={17} />,
+  "Outreach":       <MdCampaign size={17} />,
+  "Reminders":      <MdNotifications size={17} />,
+};
 
 export function DashboardPage({ routeView = "Dashboard" }) {
   const { user, logout } = useAuth();
@@ -78,10 +96,23 @@ export function DashboardPage({ routeView = "Dashboard" }) {
   const userScopedEmailReadKey = `${EMAIL_READ_STORAGE_KEY}:${user?.id || "guest"}`;
   const userScopedInterviewKey = `${INTERVIEW_STORAGE_KEY}:${user?.id || "guest"}`;
 
+  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
+
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentHour(new Date().getHours()), 60000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    function handleKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        toggleCommandPalette();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [toggleCommandPalette]);
 
   const greetingText = useMemo(() => {
     if (currentHour < 12) return "Good morning";
@@ -437,12 +468,14 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       <aside className="sidebar">
         <div className="brand">
           <h2>Job Search Hub</h2>
-          <p>{userDisplayName}</p>
-          <input
-            value={globalSearchQuery}
-            onChange={(event) => setGlobalSearchQuery(event.target.value)}
-            placeholder="Global search"
-          />
+          <div className="brand-search-wrapper">
+            <MdSearch className="brand-search-icon" size={15} />
+            <input
+              value={globalSearchQuery}
+              onChange={(event) => setGlobalSearchQuery(event.target.value)}
+              placeholder="Search everything..."
+            />
+          </div>
         </div>
 
         <nav className="menu">
@@ -453,17 +486,27 @@ export function DashboardPage({ routeView = "Dashboard" }) {
               className={`menu-item ${activeView === item ? "active" : ""}`}
               onClick={() => handleViewChange(item)}
             >
+              <span className="menu-item-icon">{NAV_ICONS[item]}</span>
               {item}
             </button>
           ))}
         </nav>
 
         <div className="sidebar-footer">
-          <p>{userDisplayName}</p>
-          {user?.bio ? <p>{user.bio}</p> : null}
+          <div className="sidebar-user-row">
+            <div className="sidebar-user-avatar">{firstName.charAt(0).toUpperCase()}</div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{userDisplayName}</span>
+              {user?.email && <span className="sidebar-user-email">{user.email}</span>}
+            </div>
+          </div>
           <div className="sidebar-account-actions">
-            <button type="button" onClick={handleProfileOpen}>Profile</button>
-            <button type="button" onClick={handleLogout}>Logout</button>
+            <button type="button" onClick={handleProfileOpen}>
+              <MdPerson size={14} /> Profile
+            </button>
+            <button type="button" onClick={handleLogout}>
+              <MdLogout size={14} /> Logout
+            </button>
           </div>
         </div>
       </aside>
@@ -639,6 +682,8 @@ export function DashboardPage({ routeView = "Dashboard" }) {
           </section>
         )}
       </main>
+      <CommandPalette />
+      <MobileTabBar activeView={activeView} onNavigate={handleViewChange} />
     </div>
   );
 }

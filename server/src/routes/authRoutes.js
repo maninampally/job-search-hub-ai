@@ -1,5 +1,20 @@
 const express = require("express");
 const crypto = require("crypto");
+const { logger } = require("../utils/logger");
+const { encryptToken, decryptToken } = require("../utils/encryption");
+const { sanitizeEmailForAI } = require("../security/dlp");
+const { rateLimitAuth, rateLimitEmailVerification, clearRateLimit } = require("../middleware/rateLimitAuth");
+const {
+  auditRegister,
+  auditLogin,
+  auditPasswordChange,
+  auditEmailVerified,
+  auditMFASetup,
+  auditMFADisable,
+  auditOAuthConnect,
+  auditOAuthDisconnect,
+  auditFailedLogin,
+} = require("../services/auditService");
 const {
   clearTokens,
   getLastChecked,
@@ -9,6 +24,7 @@ const {
   setTokensForUser,
 } = require("../store/dataStore");
 const { requireUserAuth } = require("../middleware/requireUserAuth");
+const { requireTier } = require("../middleware/requireTier");
 const {
   findUserByEmail,
   findUserById,
@@ -21,9 +37,21 @@ const {
   updateUserVerification,
   setEmailVerificationTokenHash,
   isEmailVerified,
+  createSession,
+  getSessionByHash,
+  deleteSession,
+  deleteAllUserSessions,
+  deleteOtherSessions,
+  listUserSessions,
 } = require("../store/userStore");
 const { hashPassword, verifyPassword } = require("../utils/password");
-const { createAuthToken } = require("../utils/sessionToken");
+const {
+  createAuthToken,
+  generateRefreshToken,
+  setRefreshCookie,
+  clearRefreshCookie,
+  REFRESH_COOKIE_NAME,
+} = require("../utils/sessionToken");
 const { env } = require("../config/env");
 const { oauth2Client, GMAIL_SCOPES, createGmailClient } = require("../integrations/gmail");
 
@@ -32,14 +60,22 @@ let nodemailer = null;
 try {
   nodemailer = require("nodemailer");
 } catch {
-  console.warn("[authRoutes] nodemailer not installed - email verification will be disabled");
+  logger.warn("nodemailer not installed - email verification will be disabled");
 }
 
-const { sendOTPEmail } = require('../utils/emailSender');
-const { generateOTP, calculateOTPExpiration } = require('../utils/emailExtractionUtils');
 const { query: dbQuery } = require('../services/dbAdapter');
+const {
+  generateMFASecret,
+  verifyMFAToken,
+  generateBackupCodes,
+  verifyBackupCode,
+  consumeBackupCode,
+} = require('../services/mfaService');
+const { getMFAConfig, saveMFAConfig, disableMFA } = require('../store/userStore');
 
 const authRoutes = express.Router();
+
+// Apply rate limit to auth endpoints
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim().toLowerCase());
@@ -63,10 +99,53 @@ function toSafeUserResponse(user) {
   };
 }
 
-authRoutes.post("/register", async (req, res) => {
+// Helper: determine if running in production for cookie security flag
+function isProduction() {
+  return env.ENVIRONMENT === "production";
+}
+
+// Helper: build the standard JWT payload from a user object
+function buildJwtPayload(user) {
+  return {
+    sub: user.id,
+    role: user.role || "free",
+    plan_expires: user.plan_expires || null,
+    email_verified: isEmailVerified(user),
+    mfa_passed: false, // MFA challenge sets this separately
+    email: user.email,
+    name: user.name,
+  };
+}
+
+// Helper: issue refresh token, store session, set cookie
+async function issueRefreshToken(res, userId, req) {
+  const { token, hash } = generateRefreshToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // Device fingerprint: simple hash of user-agent + ip for correlation
+  const deviceFingerprint = crypto
+    .createHash("sha256")
+    .update(`${req.ip || ""}|${req.headers["user-agent"] || ""}`)
+    .digest("hex")
+    .slice(0, 16);
+
+  await createSession(
+    userId,
+    hash,
+    deviceFingerprint,
+    req.ip || null,
+    req.headers["user-agent"] || null,
+    expiresAt
+  );
+
+  setRefreshCookie(res, token, isProduction());
+  return hash;
+}
+
+authRoutes.post("/register", rateLimitAuth({ maxAttempts: 5, windowMs: 15 * 60 * 1000 }), async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   const name = String(req.body?.name || "").trim();
+  const ipAddress = req.ip || req.connection.remoteAddress;
 
   if (!isValidEmail(email)) {
     return res.status(400).json({ error: "Valid email is required" });
@@ -79,6 +158,7 @@ authRoutes.post("/register", async (req, res) => {
   try {
     const existing = await findUserByEmail(email);
     if (existing) {
+      await auditFailedLogin(email, ipAddress, "already_registered");
       return res.status(409).json({ error: "An account with this email already exists" });
     }
 
@@ -89,22 +169,29 @@ authRoutes.post("/register", async (req, res) => {
     });
 
     const token = createAuthToken(
-      { sub: user.id, email: user.email, name: user.name },
+      buildJwtPayload(user),
       env.AUTH_TOKEN_SECRET,
-      env.AUTH_TOKEN_TTL_HOURS
+      0.25 // 15-min access token
     );
 
     await touchLastLogin(user.id);
+    await issueRefreshToken(res, user.id, req);
+    
+    // Audit logging
+    await auditRegister(user.id, email, ipAddress);
+
     const freshUser = await findUserByEmail(email);
     return res.status(201).json({ token, user: toSafeUserResponse(freshUser || user) });
   } catch (error) {
+    logger.error("Register failed", { email, error: error.message });
     return res.status(500).json({ error: "Unable to register", details: error.message });
   }
 });
 
-authRoutes.post("/login", async (req, res) => {
+authRoutes.post("/login", rateLimitAuth({ maxAttempts: 5, windowMs: 15 * 60 * 1000 }), async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
+  const ipAddress = req.ip || req.connection.remoteAddress;
 
   if (!isValidEmail(email) || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -113,20 +200,168 @@ authRoutes.post("/login", async (req, res) => {
   try {
     const user = await findUserByEmail(email);
     if (!user || !verifyPassword(password, user.passwordHash)) {
+      await auditFailedLogin(email, ipAddress, "invalid_credentials");
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if MFA is enabled
+    const mfaConfig = await getMFAConfig(user.id);
+    const mfaEnabled = mfaConfig?.totp_enabled || false;
+
+    if (mfaEnabled) {
+      // Issue short-lived pre-auth token (5 min) for MFA challenge
+      const preAuthToken = createAuthToken(
+        buildJwtPayload(user),
+        env.AUTH_TOKEN_SECRET,
+        5 / 60 // 5 minutes
+      );
+
+      // Return 200 so the frontend can read the payload - the error field signals MFA is needed.
+      // Using 403 caused parseResponse() to throw and the preAuthToken was lost.
+      return res.status(200).json({
+        error: "mfa_required",
+        preAuthToken,
+        message: "Enter your authenticator code or backup code to continue"
+      });
+    }
+
+    // No MFA - issue full access token
     const token = createAuthToken(
-      { sub: user.id, email: user.email, name: user.name },
+      buildJwtPayload(user),
       env.AUTH_TOKEN_SECRET,
-      env.AUTH_TOKEN_TTL_HOURS
+      0.25 // 15-min access token
     );
 
     await touchLastLogin(user.id);
+    await issueRefreshToken(res, user.id, req);
+    
+    // Audit logging
+    await auditLogin(user.id, email, ipAddress, false);
+    
+    // Clear rate limit on successful login
+    clearRateLimit(`email:${email}`);
+
     const refreshedUser = await findUserByEmail(email);
     return res.json({ token, user: toSafeUserResponse(refreshedUser || user) });
   } catch (error) {
+    logger.error("Login failed", { email, error: error.message });
     return res.status(500).json({ error: "Unable to login", details: error.message });
+  }
+});
+
+// POST /auth/refresh - rotate refresh token, issue new access token
+authRoutes.post("/refresh", async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  if (!refreshToken) {
+    return res.status(401).json({ error: "No refresh token" });
+  }
+
+  const hash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+  try {
+    const session = await getSessionByHash(hash);
+    if (!session) {
+      // Token not found or expired - could indicate theft, clear cookie
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: "Session expired or invalid" });
+    }
+
+    // Rotate: delete old session
+    await deleteSession(session.id);
+
+    // Fetch user for fresh payload
+    const user = await findUserById(session.user_id);
+    if (!user) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    // Issue new access token
+    const token = createAuthToken(
+      buildJwtPayload(user),
+      env.AUTH_TOKEN_SECRET,
+      0.25
+    );
+
+    // Issue new refresh token (rotation)
+    await issueRefreshToken(res, user.id, req);
+
+    return res.json({ token, user: toSafeUserResponse(user) });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to refresh session", details: error.message });
+  }
+});
+
+// POST /auth/logout - clear refresh cookie, delete session from DB
+authRoutes.post("/logout", async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+
+  if (refreshToken) {
+    try {
+      const hash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const session = await getSessionByHash(hash);
+      if (session) {
+        await deleteSession(session.id);
+      }
+    } catch (error) {
+      // Best effort - still clear the cookie even if DB fails
+      logger.warn("Logout DB cleanup failed", { error: error.message });
+    }
+  }
+
+  clearRefreshCookie(res);
+  return res.json({ success: true });
+});
+
+// GET /auth/sessions - list active sessions for current user
+authRoutes.get("/sessions", requireUserAuth, async (req, res) => {
+  try {
+    const sessions = await listUserSessions(req.authUser.id);
+    return res.json({ sessions });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to list sessions", details: error.message });
+  }
+});
+
+// DELETE /auth/sessions/:id - end a specific session (must belong to current user)
+authRoutes.delete("/sessions/:id", requireUserAuth, async (req, res) => {
+  const sessionId = req.params.id;
+  try {
+    // Verify session belongs to this user before deleting
+    const sessions = await listUserSessions(req.authUser.id);
+    const owned = sessions.find((s) => s.id === sessionId);
+    if (!owned) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+    await deleteSession(sessionId);
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to delete session", details: error.message });
+  }
+});
+
+// DELETE /auth/sessions - end all other sessions (keep current)
+authRoutes.delete("/sessions", requireUserAuth, async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  let currentSessionId = null;
+
+  if (refreshToken) {
+    try {
+      const hash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+      const session = await getSessionByHash(hash);
+      if (session) {
+        currentSessionId = session.id;
+      }
+    } catch {
+      // Ignore - will just delete all sessions if we can't identify current
+    }
+  }
+
+  try {
+    await deleteOtherSessions(req.authUser.id, currentSessionId);
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to delete sessions", details: error.message });
   }
 });
 
@@ -187,7 +422,7 @@ authRoutes.patch("/me", requireUserAuth, async (req, res) => {
  * Authenticated endpoint: Generate & send verification email
  * Rate limited to 3 requests per hour per user
  */
-authRoutes.post("/verify-email/request", requireUserAuth, async (req, res) => {
+authRoutes.post("/verify-email/request", requireUserAuth, rateLimitEmailVerification(), async (req, res) => {
   try {
     const user = await findUserById(req.authUser.id);
     if (!user) {
@@ -217,7 +452,11 @@ authRoutes.post("/verify-email/request", requireUserAuth, async (req, res) => {
     await setEmailVerificationTokenHash(req.authUser.id, tokenHash);
 
     // Send verification email
-    const verifyUrl = `${env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    // In dev, FRONTEND_URL is often missing. Fall back to request origin or Vite default.
+    const frontendUrl = env.FRONTEND_URL || req.headers.origin || "http://localhost:5173";
+    const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+
+    let emailSent = false;
 
     if (nodemailer) {
       try {
@@ -234,13 +473,13 @@ authRoutes.post("/verify-email/request", requireUserAuth, async (req, res) => {
         // Test SMTP connection
         try {
           await transporter.verify();
-          console.log("[verify-email/request] SMTP connection verified");
+          logger.debug("SMTP connection verified");
         } catch (verifyError) {
-          console.error("[verify-email/request] SMTP verify failed:", verifyError.message);
+          logger.error("SMTP verify failed", { error: verifyError.message });
         }
 
         const mailResult = await transporter.sendMail({
-          from: env.MAIL_FROM || "noreply@job-search-hub.com",
+          from: env.SMTP_FROM_EMAIL || "noreply@job-search-hub.com",
           to: user.email,
           subject: "Verify Your Job Search Hub Email",
           html: `
@@ -253,27 +492,35 @@ authRoutes.post("/verify-email/request", requireUserAuth, async (req, res) => {
             <p>This link expires in 24 hours.</p>
           `
         });
-        console.log("[verify-email/request] Email sent successfully:", mailResult.messageId);
+        emailSent = Boolean(mailResult?.messageId);
+        logger.debug("Email sent successfully", { messageId: mailResult.messageId });
       } catch (mailError) {
-        console.error("[verify-email/request] mail error:", {
+        logger.error("Mail error", {
           code: mailError.code,
           message: mailError.message,
           command: mailError.command,
-          response: mailError.response
         });
         // Still return success to prevent user from knowing if email exists
       }
     } else {
-      console.warn("[verify-email/request] nodemailer not configured, email not sent");
+      logger.warn("nodemailer not configured, email not sent");
     }
+
+    const exposeDevLink = !isProduction();
 
     res.json({
       success: true,
       message: "Verification email sent to " + user.email,
-      expiresIn: "24 hours"
+      expiresIn: "24 hours",
+      ...(exposeDevLink
+        ? {
+            devVerifyUrl: verifyUrl,
+            devEmailSent: emailSent,
+          }
+        : {}),
     });
   } catch (error) {
-    console.error("[verify-email/request]:", error);
+    logger.error("Verify email request failed", { error: error.message });
     res.status(500).json({ error: "Failed to send verification email" });
   }
 });
@@ -286,6 +533,7 @@ authRoutes.post("/verify-email/request", requireUserAuth, async (req, res) => {
 authRoutes.get("/verify-email/confirm", async (req, res) => {
   try {
     const { token } = req.query;
+    const ipAddress = req.ip || req.connection.remoteAddress;
 
     if (!token) {
       return res.status(400).json({ error: "Token required" });
@@ -316,6 +564,9 @@ authRoutes.get("/verify-email/confirm", async (req, res) => {
       tokenHash: null
     });
 
+    // Audit logging
+    await auditEmailVerified(user.id, user.email, ipAddress);
+
     // Return success with redirect URL for frontend
     res.json({
       success: true,
@@ -323,19 +574,27 @@ authRoutes.get("/verify-email/confirm", async (req, res) => {
       redirectUrl: `${env.FRONTEND_URL}/dashboard?verified=true`
     });
   } catch (error) {
-    console.error("[verify-email/confirm]:", error);
+    logger.error("Email verification confirm failed", { error: error.message });
     res.status(500).json({ error: "Verification failed" });
   }
 });
 
-authRoutes.get("/gmail", requireUserAuth, async (req, res) => {
+// PKCE helpers
+function generateCodeVerifier() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function generateCodeChallenge(verifier) {
+  return crypto.createHash("sha256").update(verifier).digest("base64url");
+}
+
+authRoutes.get("/gmail", requireUserAuth, requireTier('pro', 'gmail_sync'), async (req, res) => {
   try {
     const user = await findUserById(req.authUser.id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // NEW: Check if email is verified
     if (!isEmailVerified(user)) {
       return res.status(403).json({
         error: "Please verify your email first",
@@ -343,36 +602,46 @@ authRoutes.get("/gmail", requireUserAuth, async (req, res) => {
       });
     }
 
-    // NEW: Store user ID in session for callback to use (instead of query param)
+    // PKCE: generate verifier + challenge
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+
+    // CSRF state
     const state = crypto.randomBytes(16).toString("hex");
+
     req.session = req.session || {};
     req.session.oauthState = state;
     req.session.oauthUserId = req.authUser.id;
+    req.session.oauthCodeVerifier = codeVerifier;
 
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: GMAIL_SCOPES,
       prompt: "consent",
       state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
     });
     res.redirect(url);
   } catch (error) {
-    console.error("[auth/gmail]:", error);
+    logger.error("OAuth start failed", { error: error.message });
     res.status(500).json({ error: "OAuth start failed" });
   }
 });
 
 authRoutes.get("/callback", async (req, res) => {
   const { code, state } = req.query;
-  let userId = null;
+  const ipAddress = req.ip || req.connection.remoteAddress;
 
   try {
-    // NEW: Validate OAuth state to prevent CSRF
+    // Validate CSRF state
     if (!req.session?.oauthState || req.session.oauthState !== state) {
       return res.status(400).json({ error: "Invalid OAuth state" });
     }
 
-    userId = req.session.oauthUserId;
+    const userId = req.session.oauthUserId;
+    const codeVerifier = req.session.oauthCodeVerifier;
+
     if (!userId) {
       return res.status(400).json({ error: "OAuth session invalid" });
     }
@@ -382,27 +651,23 @@ authRoutes.get("/callback", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Exchange auth code for tokens
-    const { tokens } = await oauth2Client.getToken(code);
+    // Exchange code using PKCE verifier
+    const { tokens } = await oauth2Client.getToken({ code, codeVerifier });
 
-    // NEW: Get the Gmail account email address
+    // Verify Gmail account email matches app account email
     const gmail = createGmailClient(tokens);
     let gmailProfile;
     try {
       const profileResponse = await gmail.users.getProfile({ userId: "me" });
       gmailProfile = profileResponse.data;
     } catch (gmailError) {
-      console.error("[auth/callback] Failed to fetch Gmail profile:", gmailError.message);
-      return res.status(400).json({
-        error: "Could not verify Gmail account. Please try again.",
-        details: gmailError.message
-      });
+      logger.error("Failed to fetch Gmail profile", { error: gmailError.message });
+      return res.status(400).json({ error: "Could not verify Gmail account. Please try again." });
     }
 
     const gmailEmail = gmailProfile.emailAddress?.toLowerCase();
     const appEmail = user.email?.toLowerCase();
 
-    // NEW: Enforce strict email match
     if (gmailEmail !== appEmail) {
       return res.status(403).json({
         error: "Gmail email does not match your account email",
@@ -413,20 +678,35 @@ authRoutes.get("/callback", async (req, res) => {
       });
     }
 
-    // NEW: Store tokens per-user (not single shared row)
     try {
-      await setTokensForUser(userId, tokens, gmailProfile.emailAddress);
-      console.log(`[auth/callback] User ${userId} successfully connected Gmail: ${gmailEmail}`);
+      // Encrypt tokens before storing
+      const encryptedAccessToken = encryptToken(tokens.access_token).encrypted;
+      const encryptedRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token).encrypted : null;
+
+      const encryptedTokens = {
+        ...tokens,
+        access_token: encryptedAccessToken,
+        refresh_token: encryptedRefreshToken,
+      };
+
+      await setTokensForUser(userId, encryptedTokens, gmailProfile.emailAddress);
     } catch (storeError) {
-      console.error("[auth/callback] Failed to store tokens:", storeError);
+      logger.error("Failed to store tokens", { error: storeError.message });
       return res.status(500).json({ error: "Failed to save Gmail connection" });
     }
 
-    // Redirect to dashboard with success
+    // Audit logging
+    await auditOAuthConnect(userId, "google", gmailEmail, ipAddress);
+
+    // Clear PKCE + state from session
+    delete req.session.oauthState;
+    delete req.session.oauthUserId;
+    delete req.session.oauthCodeVerifier;
+
     const redirectUrl = `${env.FRONTEND_URL}/dashboard?gmail_connected=true&email=${encodeURIComponent(gmailEmail)}`;
     res.redirect(redirectUrl);
   } catch (error) {
-    console.error("[auth/callback] unexpected error:", error);
+    logger.error("OAuth callback failed", { error: error.message });
     res.status(500).json({ error: "OAuth callback failed" });
   }
 });
@@ -459,79 +739,6 @@ authRoutes.post("/disconnect", requireUserAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to disconnect", details: error.message });
-  }
-});
-
-/**
- * POST /auth/register
- * Step 1: Generate OTP for registration verification
- * User provides email, password, and name
- * Returns otpId and sends OTP to email
- */
-authRoutes.post("/register", async (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const name = String(req.body?.name || "").trim();
-
-  // Validation
-  if (!isValidEmail(email)) {
-    return res.status(400).json({ error: "Valid email is required" });
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
-  }
-
-  if (!name || name.length < 2) {
-    return res.status(400).json({ error: "Name is required" });
-  }
-
-  try {
-    // Check if email already exists
-    const existing = await findUserByEmail(email);
-    if (existing) {
-      return res.status(409).json({ error: "An account with this email already exists" });
-    }
-
-    // Generate OTP for registration verification
-    const otpCode = generateOTP();
-    const expiresAt = calculateOTPExpiration();
-
-    // Store OTP in registration_otps table (create if doesn't exist)
-    try {
-      await dbQuery(
-        `INSERT INTO registration_otps (email, code, name, password_hash, expires_at)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id`,
-        [email, otpCode, name, hashPassword(password), expiresAt]
-      );
-    } catch (dbError) {
-      // If table doesn't exist, fall back to storing in memory or creating user directly
-      console.warn('[register] registration_otps table not available, storing in memory');
-    }
-
-    // Send OTP email
-    const emailResult = await sendOTPEmail(email, otpCode, name, 'registration');
-
-    if (!emailResult.success) {
-      console.warn('[register] Failed to send OTP email:', emailResult.message);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'OTP sent to your email',
-      email: email,
-      maskedEmail: email.substring(0, 3) + '***' + email.substring(email.indexOf('@')),
-      expiresIn: 900, // 15 minutes
-      // Include code in response only for development mode
-      ...(emailResult.code && { code: emailResult.code })
-    });
-  } catch (error) {
-    console.error('[register] Error:', error.message);
-    return res.status(500).json({
-      error: "Unable to process registration",
-      details: error.message
-    });
   }
 });
 
@@ -570,7 +777,7 @@ authRoutes.post("/register/verify-otp", async (req, res) => {
       }
     } catch (dbError) {
       // Table might not exist, will create user directly
-      console.warn('[verify-otp] registration_otps table not available');
+      logger.warn('registration_otps table not available');
     }
 
     if (!registrationData) {
@@ -596,15 +803,16 @@ authRoutes.post("/register/verify-otp", async (req, res) => {
       // Ignore if update fails
     }
 
-    // Create auth token
+    // Create auth token with new payload shape (15-min access token)
     const token = createAuthToken(
-      { sub: user.id, email: user.email, name: user.name },
+      buildJwtPayload(user),
       env.AUTH_TOKEN_SECRET,
-      env.AUTH_TOKEN_TTL_HOURS
+      0.25
     );
 
     // Update last login
     await touchLastLogin(user.id);
+    await issueRefreshToken(res, user.id, req);
 
     return res.status(201).json({
       success: true,
@@ -612,7 +820,7 @@ authRoutes.post("/register/verify-otp", async (req, res) => {
       user: toSafeUserResponse(user)
     });
   } catch (error) {
-    console.error('[verify-otp] Error:', error.message);
+    logger.error('verify-otp failed', { error: error.message });
     return res.status(500).json({
       error: "Unable to verify OTP",
       details: error.message
@@ -620,111 +828,211 @@ authRoutes.post("/register/verify-otp", async (req, res) => {
   }
 });
 
+// ============================================================================
+// MFA ENDPOINTS
+// ============================================================================
+
 /**
- * GET /google-auth-url
- * Returns the Google OAuth authorization URL
- * Frontend redirects user to this URL
+ * POST /auth/mfa/setup - Generate TOTP secret
+ * Requires: Authentication
+ * Returns: { qrCodeUrl, secret, backupCodes }
+ * Backup codes are displayed to user once - not stored yet
  */
-authRoutes.get("/google-auth-url", (req, res) => {
+authRoutes.post("/mfa/setup", requireUserAuth, async (req, res) => {
   try {
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: "offline",
-      scope: GMAIL_SCOPES,
-      prompt: "consent",
+    const user = await findUserById(req.authUser.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if MFA already enabled
+    const existing = await getMFAConfig(req.authUser.id);
+    if (existing?.totp_enabled) {
+      return res.status(409).json({ error: "MFA already enabled for this user" });
+    }
+
+    // Generate TOTP secret + QR code
+    const { secret, qrCodeUrl } = await generateMFASecret(user.email);
+
+    // Generate backup codes (unhashed for display)
+    const { codes: backupCodes, hashes: backupCodeHashes } = generateBackupCodes(8);
+
+    // Store in session for confirmation step (temporary, until verify endpoint)
+    req.session = req.session || {};
+    req.session.mfaSetupSecret = secret;
+    req.session.mfaSetupBackupCodeHashes = backupCodeHashes;
+
+    res.json({
+      qrCodeUrl,
+      secret, // For manual entry as fallback
+      backupCodes, // Show once before verification
+      message: "Scan QR code with authenticator app. Keep backup codes safe."
     });
-    res.json({ authUrl });
   } catch (error) {
-    console.error("[google-auth-url]", error);
-    res.status(500).json({ error: "Unable to generate auth URL" });
+    console.error("[auth/mfa/setup]:", error);
+    res.status(500).json({ error: "Failed to setup MFA" });
   }
 });
 
 /**
- * POST /google-auth
- * Handles Google OAuth callback
- * Receives authorization code, exchanges for tokens
- * Creates/finds user, auto-verifies email, returns JWT
+ * POST /auth/mfa/verify - Verify TOTP code to complete enrollment
+ * Requires: Authentication + valid TOTP code from authenticator app
+ * Body: { code: "123456" }
+ * Returns: { success: true, backupCodes: [...] }
  */
-authRoutes.post("/google-auth", async (req, res) => {
-  const { code } = req.body;
+authRoutes.post("/mfa/verify", requireUserAuth, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
 
-  if (!code) {
-    return res.status(400).json({ error: "Authorization code is required" });
+  if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+    return res.status(400).json({ error: "Invalid code format. Expected 6 digits." });
   }
 
   try {
-    // Exchange authorization code for tokens
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    // Check if setup was initiated
+    const secret = req.session?.mfaSetupSecret;
+    const backupCodeHashes = req.session?.mfaSetupBackupCodeHashes;
 
-    // Get user info from Google
-    const { google } = require("googleapis");
-    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-    const googleUser = await oauth2.userinfo.get();
-
-    const email = googleUser.data?.email?.toLowerCase();
-    const name = googleUser.data?.name || "Google User";
-    const googleId = googleUser.data?.id;
-
-    if (!email) {
-      return res.status(400).json({ error: "Unable to retrieve email from Google" });
+    if (!secret || !backupCodeHashes) {
+      return res.status(400).json({ error: "MFA setup not initiated. Call /auth/mfa/setup first." });
     }
 
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Invalid email from Google account" });
+    // Verify TOTP code
+    const isValid = verifyMFAToken(secret, code);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid authenticator code" });
     }
 
-    // Find or create user
-    let user = await findUserByEmail(email);
+    // Save MFA config (enabled)
+    await saveMFAConfig(req.authUser.id, {
+      totp_secret: secret,
+      totp_enabled: true,
+      backup_codes: backupCodeHashes,
+      enrolled_at: new Date().toISOString(),
+    });
 
-    if (!user) {
-      // New Google user - auto-generate a password (not used, but required by schema)
-      const tempPassword = crypto.randomBytes(16).toString("hex");
-      user = await createUser({
-        email,
-        passwordHash: hashPassword(tempPassword),
-        name: name || "User",
-      });
-      console.log(`[google-auth] Created new user: ${email}`);
-    }
+    // Clear session
+    delete req.session.mfaSetupSecret;
+    delete req.session.mfaSetupBackupCodeHashes;
 
-    // Auto-verify email (Google has already verified it)
-    if (!isEmailVerified(user)) {
-      await updateUserVerification(user.id, {
-        email_verified_at: new Date().toISOString(),
-      });
-      user.email_verified_at = new Date().toISOString();
-      console.log(`[google-auth] Auto-verified email for: ${email}`);
-    }
-
-    // Store Google tokens for future Gmail syncing
-    await setTokensForUser(user.id, tokens);
-
-    // Create app JWT token
-    const token = createAuthToken(
-      { sub: user.id, email: user.email, name: user.name },
-      env.AUTH_TOKEN_SECRET,
-      env.AUTH_TOKEN_TTL_HOURS
-    );
-
-    // Update last login
-    await touchLastLogin(user.id);
-
-    // Refresh user object to ensure all fields are current
-    const freshUser = await findUserByEmail(email);
-
-    return res.json({
+    res.json({
       success: true,
-      token,
-      user: toSafeUserResponse(freshUser || user),
-      message: "Successfully authenticated with Google",
+      message: "MFA enabled successfully"
     });
   } catch (error) {
-    console.error("[google-auth]", error);
-    res.status(500).json({
-      error: "Failed to authenticate with Google",
-      details: error.message,
+    console.error("[auth/mfa/verify]:", error);
+    res.status(500).json({ error: "Failed to verify MFA" });
+  }
+});
+
+/**
+ * POST /auth/mfa/disable - Disable MFA
+ * Requires: Authentication + valid TOTP code (proof of ownership)
+ * Body: { code: "123456" }
+ * Returns: { success: true }
+ */
+authRoutes.post("/mfa/disable", requireUserAuth, async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+
+  if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+    return res.status(400).json({ error: "Invalid code format. Expected 6 digits." });
+  }
+
+  try {
+    const mfaConfig = await getMFAConfig(req.authUser.id);
+    if (!mfaConfig || !mfaConfig.totp_enabled) {
+      return res.status(400).json({ error: "MFA is not enabled for this user" });
+    }
+
+    // Verify TOTP code
+    const isValid = verifyMFAToken(mfaConfig.totp_secret, code);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid authenticator code" });
+    }
+
+    // Disable MFA
+    await disableMFA(req.authUser.id);
+
+    res.json({
+      success: true,
+      message: "MFA disabled successfully"
     });
+  } catch (error) {
+    console.error("[auth/mfa/disable]:", error);
+    res.status(500).json({ error: "Failed to disable MFA" });
+  }
+});
+
+/**
+ * POST /auth/mfa/challenge - Verify TOTP during login
+ * Used after password verification to complete MFA challenge
+ * Requires: Valid pre-auth token (issued during login if MFA enabled)
+ * Body: { code: "123456" }
+ * Returns: { success: true, token: "...", user: {...} }
+ */
+authRoutes.post("/mfa/challenge", async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  const preAuthToken = req.body?.preAuthToken;
+
+  if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+    return res.status(400).json({ error: "Invalid code format. Expected 6 digits." });
+  }
+
+  if (!preAuthToken) {
+    return res.status(400).json({ error: "Pre-auth token required" });
+  }
+
+  try {
+    // Verify pre-auth token (should be 5-min token with minimal payload)
+    const preAuthPayload = verifyAuthToken(preAuthToken, env.AUTH_TOKEN_SECRET);
+    if (!preAuthPayload) {
+      return res.status(401).json({ error: "Invalid or expired pre-auth token" });
+    }
+
+    const userId = preAuthPayload.sub;
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const mfaConfig = await getMFAConfig(userId);
+    if (!mfaConfig || !mfaConfig.totp_enabled) {
+      return res.status(400).json({ error: "MFA not enabled for this user" });
+    }
+
+    // Try TOTP code first
+    let isValid = verifyMFAToken(mfaConfig.totp_secret, code);
+
+    // If not valid, try backup codes
+    if (!isValid && mfaConfig.backup_codes?.length > 0) {
+      isValid = verifyBackupCode(code, mfaConfig.backup_codes);
+      if (isValid) {
+        // Consume the backup code
+        const newBackupCodeHashes = consumeBackupCode(code, mfaConfig.backup_codes);
+        await saveMFAConfig(userId, {
+          ...mfaConfig,
+          backup_codes: newBackupCodeHashes,
+        });
+      }
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid authenticator or backup code" });
+    }
+
+    // MFA verified - issue full access token
+    const token = createAuthToken(
+      buildJwtPayload({ ...user, mfa_passed: true }),
+      env.AUTH_TOKEN_SECRET,
+      0.25 // 15-min access token
+    );
+
+    await touchLastLogin(userId);
+    await issueRefreshToken(res, userId, req);
+
+    return res.json({ success: true, token, user: toSafeUserResponse(user) });
+  } catch (error) {
+    console.error("[auth/mfa/challenge]:", error);
+    res.status(500).json({ error: "Failed to verify MFA" });
   }
 });
 

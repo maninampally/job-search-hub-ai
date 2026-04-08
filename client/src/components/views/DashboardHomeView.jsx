@@ -8,6 +8,8 @@ const CARD_ITEMS = [
 import { useState } from "react";
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from "recharts";
 import EmailExtractionVerification from "../EmailExtractionVerification.jsx";
+import { OnboardingChecklist } from "../shared/OnboardingChecklist.jsx";
+import { ActivityFeed } from "../shared/ActivityFeed.jsx";
 import "../emailExtractionVerification.css";
 
 export default function DashboardHomeView({

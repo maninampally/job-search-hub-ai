@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { SessionsPanel } from "../components/auth/SessionsPanel";
+import { MFASetupModal } from "../components/auth/MFASetupModal";
+import { useUIStore } from "../stores/uiStore";
 import { updateMyProfile, changePassword, requestEmailVerification, confirmEmailVerification } from "../api/backend";
 
 export default function ProfilePage() {

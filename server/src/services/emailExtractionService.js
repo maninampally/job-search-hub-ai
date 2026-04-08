@@ -4,7 +4,6 @@
  * Manages security policies: lockouts, expiration, one-time use, audit logging
  */
 
-const { v4: uuidv4 } = require('uuid');
 const { query: dbQuery } = require('./dbAdapter');
 const { sendOTPEmail } = require('../utils/emailSender');
 const {

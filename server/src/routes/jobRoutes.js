@@ -19,6 +19,8 @@ const { env } = require("../config/env");
 const { VALID_STATUSES, EMAIL_TYPES } = require("../config/constants");
 const { rateLimitMiddleware } = require("../security/rateLimiter");
 const { logSync, logError } = require("../security/auditLogger");
+const { requireUserAuth } = require("../middleware/requireUserAuth");
+const { requireTier } = require("../middleware/requireTier");
 
 const jobRoutes = express.Router();
 
@@ -82,7 +84,7 @@ async function sendWebhook(url, payload) {
   }
 }
 
-jobRoutes.get("/", async (req, res) => {
+jobRoutes.get("/", requireUserAuth, async (req, res) => {
   try {
     const userId = getAuthenticatedUserId(req);
     const jobs = await getJobs({ userId });
@@ -93,13 +95,13 @@ jobRoutes.get("/", async (req, res) => {
   }
 });
 
-jobRoutes.get("/sync-status", (req, res) => {
+jobRoutes.get("/sync-status", requireUserAuth, (req, res) => {
   // NEW: Support both global and per-user status queries
   const userId = getAuthenticatedUserId(req);
   res.json(getSyncStatus(userId));
 });
 
-jobRoutes.post("/sync", rateLimitMiddleware, async (req, res) => {
+jobRoutes.post("/sync", requireUserAuth, requireTier('pro', 'gmail_sync'), rateLimitMiddleware, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) {
     return res.status(401).json({ error: "Not authenticated" });
