@@ -13,6 +13,7 @@ export function VerifyEmailPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [token, setToken] = useState(searchParams.get("token") || "");
+  const [autoSentEmail, setAutoSentEmail] = useState(false);
 
   // Auto-verify if token in URL
   useEffect(() => {
@@ -45,6 +46,33 @@ export function VerifyEmailPage() {
 
     autoVerify();
   }, [token, refreshUser, navigate]);
+
+  // Auto-send verification email on first page load (if no token and email not verified)
+  useEffect(() => {
+    if (token || autoSentEmail || user?.email_verified_at) {
+      return;
+    }
+
+    async function autoSendEmail() {
+      try {
+        setStatus("requesting");
+        setAutoSentEmail(true);
+        const result = await requestEmailVerification();
+        
+        if (result.success) {
+          setMessage(result.message || `Verification email sent to ${user?.email}`);
+          setStatus("idle");
+        }
+      } catch (err) {
+        setStatus("idle");
+        setError(err.message || "Failed to send verification email");
+      }
+    }
+
+    // Small delay to ensure user context is fully loaded
+    const timer = setTimeout(autoSendEmail, 500);
+    return () => clearTimeout(timer);
+  }, [token, autoSentEmail, user?.email, user?.email_verified_at]);
 
   async function handleRequestVerification() {
     try {
