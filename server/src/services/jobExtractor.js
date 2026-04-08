@@ -1,9 +1,10 @@
-const Anthropic = require("@anthropic-ai/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { env } = require("../config/env");
 const { withRetry, withTimeout } = require("../utils/asyncTools");
 const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
 
-const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 function normalizeEmailType(rawType) {
   const value = String(rawType || "").toLowerCase();
@@ -74,14 +75,14 @@ async function extractJobInfo({ subject, from, date, body }) {
     const res = await withRetry(
       () =>
         withTimeout(
-          () =>
-            anthropic.messages.create({
-              model: "claude-sonnet-4-20250514",
-              max_tokens: 500,
-              messages: [
+          async () => {
+            const response = await model.generateContent({
+              contents: [
                 {
                   role: "user",
-                  content: `You are a job application email parser. Analyze this email carefully and return ONLY valid JSON with no extra text.
+                  parts: [
+                    {
+                      text: `You are a job application email parser. Analyze this email carefully and return ONLY valid JSON with no extra text.
 
 COMPANY NAME RULES:
 - Extract from email body phrases like 'applying to [X]', 'your application at [X]', 'interest in [X]'
@@ -139,16 +140,23 @@ Subject: ${subject}
 From: ${from}
 Date: ${date}
 Body: ${cleanedBody}`,
+                    },
+                  ],
                 },
               ],
-            }),
+              generationConfig: {
+                maxOutputTokens: 500,
+              },
+            });
+            return response;
+          },
           env.EXTERNAL_API_TIMEOUT_MS,
-          "Claude extraction timed out"
+          "Gemini extraction timed out"
         ),
       { retries: Math.max(env.RETRY_ATTEMPTS, 3) }
     );
 
-    const text = res.content[0]?.text || "{}";
+    const text = res.response?.text?.() || "{}";
     const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
 
     const normalizedEmailType = normalizeEmailType(parsed.emailType);
