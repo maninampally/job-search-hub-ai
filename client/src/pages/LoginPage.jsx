@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { BACKEND_URL } from "../api/backend";
+import styles from "./LoginPage.module.css";
 
 export default function LoginPage() {
   const { isAuthenticated, login, register } = useAuth();
@@ -26,8 +27,6 @@ export default function LoginPage() {
   function handleGoogleSignIn() {
     setGoogleLoading(true);
     setError("");
-    // Pattern B: direct redirect to backend OAuth endpoint
-    // Backend stores auth user in session, handles PKCE + CSRF state, redirects to dashboard on success
     window.location.href = `${BACKEND_URL}/auth/gmail`;
   }
 
@@ -38,7 +37,6 @@ export default function LoginPage() {
 
     try {
       if (mode === "register") {
-        // Validate password confirmation
         if (password !== confirmPassword) {
           setError("Passwords do not match");
           setSubmitting(false);
@@ -61,112 +59,182 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>{greeting}</h1>
-        <p>Sign in to open your Job Search Hub workspace.</p>
-
-        <div className="auth-mode-switch">
-          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>
-            Login
-          </button>
-          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>
-            Register
-          </button>
+    <div className={styles.container}>
+      {/* Left Panel - Branding */}
+      <div className={styles.leftPanel}>
+        <div className={styles.brandingContent}>
+          <div className={styles.logoIcon}>
+            <div className={styles.logoIconInner} />
+          </div>
+          <h1 className={styles.brandTitle}>Job Search Hub</h1>
+          <p className={styles.brandTagline}>
+            Track applications, automate outreach, and land your dream job faster.
+          </p>
+          <ul className={styles.featureList}>
+            <li className={styles.featureItem}>
+              <span className={styles.checkIcon} />
+              <span>Kanban board to track all applications</span>
+            </li>
+            <li className={styles.featureItem}>
+              <span className={styles.checkIcon} />
+              <span>Gmail sync for automatic updates</span>
+            </li>
+            <li className={styles.featureItem}>
+              <span className={styles.checkIcon} />
+              <span>AI-powered interview preparation</span>
+            </li>
+            <li className={styles.featureItem}>
+              <span className={styles.checkIcon} />
+              <span>Smart reminders and follow-ups</span>
+            </li>
+          </ul>
         </div>
+      </div>
 
-        {/* Google OAuth Button */}
-        <div style={{ marginTop: "1.375rem" }}>
+      {/* Right Panel - Form */}
+      <div className={styles.rightPanel}>
+        <div className={styles.formContainer}>
+          <h2 className={styles.greeting}>{greeting}</h2>
+          <p className={styles.subtitle}>
+            {mode === "login" 
+              ? "Sign in to your Job Search Hub workspace." 
+              : "Create your account to get started."}
+          </p>
+
+          {/* Mode Switch */}
+          <div className={styles.modeSwitch}>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${mode === "login" ? styles.active : ""}`}
+              onClick={() => setMode("login")}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${mode === "register" ? styles.active : ""}`}
+              onClick={() => setMode("register")}
+            >
+              Register
+            </button>
+          </div>
+
+          {/* Google OAuth Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading || submitting}
-            className="google-signin-button"
+            className={styles.googleButton}
           >
-            {googleLoading ? "Redirecting to Google..." : "🔐 Continue with Google"}
+            <span className={styles.googleIcon} />
+            {googleLoading ? "Redirecting..." : "Continue with Google"}
           </button>
-          <div style={{ textAlign: "center", margin: "0.875rem 0", color: "var(--text-muted)" }}>
-            or
+
+          {/* Divider */}
+          <div className={styles.divider}>
+            <span className={styles.dividerLine} />
+            <span className={styles.dividerText}>or continue with email</span>
+            <span className={styles.dividerLine} />
           </div>
-        </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {mode === "register" && (
-            <label>
-              Full Name
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                required
-              />
-            </label>
-          )}
+          {/* Form */}
+          <form className={styles.form} onSubmit={handleSubmit}>
+            {mode === "register" && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Full Name</label>
+                <div className={styles.inputWrapper}>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    className={styles.input}
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-          </label>
-
-          <label>
-            Password
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                minLength={8}
-                required
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
-            </div>
-          </label>
-
-          {mode === "register" && (
-            <label>
-              Confirm Password
-              <div className="password-input-wrapper">
+            <div className={styles.inputGroup}>
+              <label className={styles.label}>Email</label>
+              <div className={styles.inputWrapper}>
                 <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm password"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={styles.input}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className={styles.inputGroup}>
+              <label className={styles.label}>Password</label>
+              <div className={styles.inputWrapper}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className={styles.input}
                   minLength={8}
                   required
                 />
                 <button
                   type="button"
-                  className="password-toggle"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  title={showConfirmPassword ? "Hide password" : "Show password"}
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+                  {showPassword ? "◉" : "○"}
                 </button>
               </div>
-            </label>
-          )}
+            </div>
 
-          {error && <div className="auth-error">{error}</div>}
+            {mode === "register" && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Confirm Password</label>
+                <div className={styles.inputWrapper}>
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm password"
+                    className={styles.input}
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    title={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? "◉" : "○"}
+                  </button>
+                </div>
+              </div>
+            )}
 
-          <button type="submit" disabled={submitting || googleLoading}>
-            {submitting ? "Please wait..." : mode === "register" ? "Create Account" : "Sign In"}
-          </button>
-        </form>
+            {error && <div className={styles.error}>{error}</div>}
+
+            <button 
+              type="submit" 
+              className={styles.submitButton}
+              disabled={submitting || googleLoading}
+            >
+              {submitting ? "Please wait..." : mode === "register" ? "Create Account" : "Sign In"}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className={styles.footer}>
+            By continuing, you agree to our{" "}
+            <a href="/terms">Terms of Service</a> and{" "}
+            <a href="/privacy">Privacy Policy</a>
+          </div>
+        </div>
       </div>
     </div>
   );
