@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { env } = require("../config/env");
-const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
+const { sanitizeEmailForAI } = require("../security/dlp");
 const { logger } = require("../utils/logger");
 
 /**

@@ -3,7 +3,7 @@ const OpenAI = require("openai");
 const { Anthropic } = require("@anthropic-ai/sdk");
 const { env } = require("../config/env");
 const { withRetry, withTimeout } = require("../utils/asyncTools");
-const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
+const { sanitizeEmailForAI } = require("../security/dlp");
 const { logger } = require("../utils/logger");
 const { getRecommendedLlm, isProviderAvailable } = require("./llmSelector");
 
