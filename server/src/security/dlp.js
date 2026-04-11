@@ -95,4 +95,9 @@ function sanitizeEmailSubject(subject) {
     .replace(/salary|comp|pay/gi, "[REDACTED]");
 }
 
-module.exports = { sanitizeEmailForAI, sanitizeEmailSubject };
+function validateEmailLength(emailBody, maxChars = 10000) {
+  if (!emailBody) return true;
+  return String(emailBody).length <= maxChars;
+}
+
+module.exports = { sanitizeEmailForAI, sanitizeEmailSubject, validateEmailLength };
