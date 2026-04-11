@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 const { env } = require("../config/env");
+const { logger } = require("../utils/logger");
 
 const localUserStorePath = path.resolve(__dirname, "../../data/users-local-store.json");
 
@@ -76,6 +77,7 @@ function localCreateUser({ email, passwordHash, name }) {
     createdAt: now,
     updatedAt: now,
     lastLoginAt: null,
+    email_verified_at: now,
   };
 
   localStore.users.push(user);
@@ -154,6 +156,13 @@ function mapDbToUser(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastLoginAt: row.last_login_at || null,
+    role: row.role || "free",
+    plan_expires: row.plan_expires || null,
+    email_verified_at: row.email_verified_at || null,
+    email_verification_token_hash: row.email_verification_token_hash || null,
+    email_verification_sent_at: row.email_verification_sent_at || null,
+    email_verification_attempts: row.email_verification_attempts || 0,
+    is_suspended: row.is_suspended || false,
   };
 }
 
@@ -216,6 +225,7 @@ async function createUser(payload) {
         bio: "",
         created_at: now,
         updated_at: now,
+        email_verified_at: now,
       };
       const { data, error } = await supabase.from("app_users").insert(row).select("*").single();
       if (error) throw error;
@@ -423,7 +433,7 @@ async function createSession(userId, tokenHash, deviceFingerprint, ipAddress, us
     return data;
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - session not stored (run migration 010_user_sessions.sql)");
+      logger.warn("user_sessions table not found - session not stored");
       return null;
     }
     throw error;
@@ -448,7 +458,7 @@ async function getSessionByHash(tokenHash) {
     return data || null;
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - cannot look up session");
+      logger.warn("user_sessions table not found - cannot look up session");
       return null;
     }
     throw error;
@@ -471,7 +481,7 @@ async function deleteSession(sessionId) {
     return true;
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - cannot delete session");
+      logger.warn("user_sessions table not found - cannot delete session");
       return null;
     }
     throw error;
@@ -494,7 +504,7 @@ async function deleteAllUserSessions(userId) {
     return true;
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - cannot delete sessions");
+      logger.warn("user_sessions table not found - cannot delete sessions");
       return null;
     }
     throw error;
@@ -522,7 +532,7 @@ async function deleteOtherSessions(userId, currentSessionId) {
     return true;
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - cannot delete other sessions");
+      logger.warn("user_sessions table not found - cannot delete other sessions");
       return null;
     }
     throw error;
@@ -547,7 +557,7 @@ async function listUserSessions(userId) {
     return data || [];
   } catch (error) {
     if (isMissingSessionsTableError(error)) {
-      console.warn("[userStore] user_sessions table not found - cannot list sessions");
+      logger.warn("user_sessions table not found - cannot list sessions");
       return [];
     }
     throw error;
@@ -586,7 +596,7 @@ async function getMFAConfig(userId) {
         throw error;
       }
     } catch (error) {
-      console.warn('[userStore] mfa_config table lookup failed:', error.message);
+      logger.warn("mfa_config table lookup failed", { error: error.message });
     }
   }
 
@@ -620,7 +630,7 @@ async function saveMFAConfig(userId, { totp_secret, totp_enabled, backup_codes, 
       if (error) throw error;
       return;
     } catch (error) {
-      console.warn('[userStore] mfa_config save failed:', error.message);
+      logger.warn("mfa_config save failed", { error: error.message });
     }
   }
 
@@ -652,7 +662,7 @@ async function disableMFA(userId) {
       if (error) throw error;
       return;
     } catch (error) {
-      console.warn('[userStore] mfa disable failed:', error.message);
+      logger.warn("mfa disable failed", { error: error.message });
     }
   }
 

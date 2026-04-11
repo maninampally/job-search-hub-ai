@@ -1,8 +1,10 @@
 const express = require("express");
 const { env } = require("../config/env");
+const { logger } = require("../utils/logger");
 const { query: dbQuery } = require("../services/dbAdapter");
 
 const billingRoutes = express.Router();
+const billingWebhookRouter = express.Router();
 
 function getStripe() {
   if (!env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not configured");
@@ -98,8 +100,8 @@ billingRoutes.get("/portal", async (req, res) => {
   }
 });
 
-// POST /billing/webhook - Stripe webhook handler (raw body required)
-billingRoutes.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+// POST /billing/webhook - Stripe webhook handler (raw body applied at mount)
+billingWebhookRouter.post("/", async (req, res) => {
   if (!env.STRIPE_WEBHOOK_SECRET) {
     return res.status(400).json({ error: "Webhook secret not configured" });
   }
@@ -141,9 +143,9 @@ billingRoutes.post("/webhook", express.raw({ type: "application/json" }), async 
     }
     return res.json({ received: true });
   } catch (err) {
-    console.error("[billing/webhook]", err.message);
+    logger.error("Webhook processing failed", { error: err.message });
     return res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 
-module.exports = { billingRoutes };
+module.exports = { billingRoutes, billingWebhookRouter };

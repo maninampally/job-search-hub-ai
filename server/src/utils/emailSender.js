@@ -5,6 +5,7 @@
  */
 
 const { env } = require('../config/env');
+const { logger } = require('./logger');
 
 let nodemailer = null;
 let transporter = null;
@@ -26,12 +27,12 @@ try {
       },
     });
     
-    console.log(`[emailSender] SMTP configured: ${env.SMTP_HOST}:${env.SMTP_PORT}`);
+    logger.info("SMTP configured", { host: env.SMTP_HOST, port: env.SMTP_PORT });
   } else {
-    console.warn('[emailSender] SMTP not fully configured - OTP will be logged to console');
+    logger.warn("SMTP not fully configured - OTP will be logged");
   }
 } catch (error) {
-  console.warn('[emailSender] nodemailer not available - OTP delivery disabled');
+  logger.warn("nodemailer not available - OTP delivery disabled");
 }
 
 /**
@@ -45,7 +46,7 @@ try {
 async function sendOTPEmail(recipientEmail, otpCode, recipientName = 'User', emailType = 'extraction') {
   // Validation
   if (!recipientEmail || !otpCode) {
-    console.warn('[emailSender] Missing recipientEmail or otpCode');
+    logger.warn("Missing recipientEmail or otpCode");
     return {
       success: false,
       message: 'Missing email or OTP code'
@@ -54,18 +55,7 @@ async function sendOTPEmail(recipientEmail, otpCode, recipientName = 'User', ema
 
   // In console/dev mode, just log the OTP
   if (env.OTP_SEND_MODE === 'console' || !transporter) {
-    console.log(`
-╔════════════════════════════════════════════════════════════╗
-║                   OTP VERIFICATION CODE                    ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  Email:     ${recipientEmail.padEnd(49).substring(0, 49)}║
-║  OTP Code:  ${otpCode.toString().padStart(45)}║
-║  Type:      ${emailType.padEnd(45)}║
-║  Expires:   15 minutes                                    ║
-║                                                            ║
-╚════════════════════════════════════════════════════════════╝
-    `);
+    logger.info("OTP code (dev mode)", { email: recipientEmail, otp: otpCode, type: emailType, expires: "15 minutes" });
     
     return {
       success: true,
@@ -93,7 +83,7 @@ async function sendOTPEmail(recipientEmail, otpCode, recipientName = 'User', ema
       replyTo: env.SMTP_FROM_EMAIL,
     });
 
-    console.log(`[emailSender] Email sent successfully to ${recipientEmail} (messageId: ${info.messageId})`);
+    logger.info("Email sent", { to: recipientEmail, messageId: info.messageId });
 
     return {
       success: true,
@@ -101,11 +91,10 @@ async function sendOTPEmail(recipientEmail, otpCode, recipientName = 'User', ema
       messageId: info.messageId
     };
   } catch (error) {
-    console.error('[emailSender] Failed to send email:', {
-      message: error.message,
+    logger.error("Failed to send email", {
+      error: error.message,
       code: error.code,
       command: error.command,
-      response: error.response
     });
     return {
       success: false,
@@ -222,16 +211,16 @@ This is an automated message, please do not reply to this email.
  */
 async function verifySmtpConnection() {
   if (!transporter) {
-    console.warn('[emailSender] SMTP not configured');
+    logger.warn("SMTP not configured");
     return false;
   }
 
   try {
     await transporter.verify();
-    console.log('[emailSender] SMTP connection verified successfully');
+    logger.info("SMTP connection verified");
     return true;
   } catch (error) {
-    console.error('[emailSender] SMTP connection failed:', error.message);
+    logger.error("SMTP connection failed", { error: error.message });
     return false;
   }
 }

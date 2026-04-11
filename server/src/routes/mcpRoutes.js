@@ -1,11 +1,11 @@
 const express = require("express");
 const fs = require("fs/promises");
 const path = require("path");
+const { logger } = require("../utils/logger");
 const {
   addJob,
   deleteJob,
   getJobs,
-  getLastChecked,
   getTokens,
   updateJob,
 } = require("../store/dataStore");
@@ -47,12 +47,15 @@ function enforceAllowedTool(toolName) {
 
 function requireMcpAuth(req, res, next) {
   if (!env.MCP_AUTH_TOKEN) {
+    if (env.ENVIRONMENT === "production") {
+      return res.status(401).json({ error: "MCP_AUTH_TOKEN not configured" });
+    }
     return next();
   }
 
   const authHeader = String(req.headers.authorization || "").trim();
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (token !== env.MCP_AUTH_TOKEN) {
+  if (!token || token !== env.MCP_AUTH_TOKEN) {
     return res.status(401).json({ error: "Unauthorized MCP request" });
   }
 
@@ -91,7 +94,7 @@ function enforceToolGuardrails(req, res, next) {
 function auditMcpRequest(req, res, next) {
   if (env.MCP_AUDIT_LOG_ENABLED) {
     const toolName = getToolNameFromRequest(req);
-    console.log(`[mcp] ${new Date().toISOString()} tool=${toolName} method=${req.method} ip=${req.ip}`);
+    logger.info("MCP request", { tool: toolName, method: req.method, ip: req.ip });
   }
   return next();
 }
@@ -138,12 +141,12 @@ mcpRoutes.get("/health", async (req, res) => {
 mcpRoutes.get("/auth_status", async (req, res) => {
   try {
     const tokens = await getTokens();
-    const lastChecked = await getLastChecked();
     return res.json({
       tool: "auth_status",
       result: {
         connected: Boolean(tokens),
-        lastChecked,
+        lastChecked: null,
+        note: "Per-user Gmail uses oauth_tokens by owner; use app auth status for lastChecked.",
       },
     });
   } catch (error) {
@@ -154,12 +157,10 @@ mcpRoutes.get("/auth_status", async (req, res) => {
 mcpRoutes.get("/list_jobs", async (req, res) => {
   try {
     const jobs = await getJobs();
-    const lastChecked = await getLastChecked();
     return res.json({
       tool: "list_jobs",
       result: {
         jobs,
-        lastChecked,
         count: jobs.length,
       },
     });
@@ -170,24 +171,26 @@ mcpRoutes.get("/list_jobs", async (req, res) => {
 
 mcpRoutes.post("/sync_jobs", async (req, res) => {
   try {
-    const tokens = await getTokens();
-    if (!tokens) {
-      return res.status(401).json({ error: "Not connected" });
+    const userId = String(req.body?.userId || req.query?.userId || "").trim();
+    if (!userId) {
+      return res.status(400).json({
+        error: "userId required",
+        hint: "Pass owner user UUID in body or query. Legacy global Gmail token is not supported.",
+      });
     }
 
     const mode = normalizeSyncMode(req.body?.mode || req.query?.mode);
-    await fetchJobEmails({ mode });
+    await fetchJobEmails({ mode, userId });
 
-    const jobs = await getJobs();
-    const lastChecked = await getLastChecked();
+    const jobs = await getJobs({ userId });
 
     return res.json({
       tool: "sync_jobs",
       result: {
         jobs,
-        lastChecked,
         count: jobs.length,
         mode,
+        userId,
       },
     });
   } catch (error) {

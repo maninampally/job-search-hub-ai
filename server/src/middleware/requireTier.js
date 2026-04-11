@@ -1,3 +1,5 @@
+const { env } = require("../config/env");
+
 // Tier hierarchy - index = level (higher index = higher tier)
 const TIER_ORDER = ["free", "pro", "elite", "admin"];
 
@@ -56,4 +58,15 @@ function requireTier(tier, featureLabel) {
   };
 }
 
-module.exports = { requireTier, TIER_ORDER };
+/**
+ * Gmail sync is a Pro feature. When ALLOW_FREE_TIER_GMAIL_SYNC is true (default in non-production),
+ * free users can still connect Gmail and run sync for local testing.
+ */
+function requireTierGmailSync(req, res, next) {
+  if (env.ALLOW_FREE_TIER_GMAIL_SYNC) {
+    return next();
+  }
+  return requireTier("pro", "gmail_sync")(req, res, next);
+}
+
+module.exports = { requireTier, requireTierGmailSync, TIER_ORDER };
