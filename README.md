@@ -80,7 +80,9 @@ Optional:
 - `DAILY_SYNC_LOOKBACK_DAYS`
 - `GMAIL_SYNC_MAX_RESULTS_PER_PAGE`
 - `INITIAL_SYNC_MAX_MESSAGES`
-- `SYNC_CRON`
+- `INCREMENTAL_SYNC_MAX_MESSAGES`
+- `SYNC_CRON`, `SYNC_CRON_TIMEZONE`
+- `RATE_LIMIT_SYNC_FREE`, `RATE_LIMIT_SYNC_PRO`, `RATE_LIMIT_SYNC_ELITE`, `RATE_LIMIT_SYNC_ADMIN`
 
 Frontend build-time:
 - `VITE_BACKEND_URL`
@@ -90,6 +92,7 @@ See `.env.example` for sample values.
 ## Documentation
 - docs/DEPLOYMENT.md
 - docs/ARCHITECTURE.md
+- docs/pricing-and-infra-cost-estimate.md (rough cost and pricing notes)
 - PROJECT_DOCUMENTATION.md (complete end-to-end documentation)
 
 ## Production Verification
@@ -100,7 +103,7 @@ See `.env.example` for sample values.
 - `GET /mcp/health`
 - `GET /mcp/auth_status`
 - `GET /mcp/list_jobs`
-- `POST /mcp/sync_jobs` (optional `mode`: `daily` or `initial`)
+- `POST /mcp/sync_jobs` (required `userId`, optional `mode`: `daily` or `initial`)
 - `POST /mcp/create_job`
 - `PATCH /mcp/update_job`
 - `DELETE /mcp/delete_job?id=<job_id>`

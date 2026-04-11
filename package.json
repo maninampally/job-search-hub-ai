@@ -9,12 +9,18 @@
     "dev": "nodemon server/index.js",
     "dev:server": "nodemon server/index.js",
     "dev:client": "npm --prefix client run dev",
-    "db:schema": "echo Run docs/database/schema.sql in your Supabase SQL editor"
+    "db:schema": "echo Run docs/database/schema.sql in your Supabase SQL editor",
+    "db:migrate": "node server/src/scripts/runMigrations.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint server/src/"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.21.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@supabase/supabase-js": "^2.49.8",
@@ -27,14 +33,23 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^8.0.5",
+    "openai": "^4.80.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1",
     "speakeasy": "^2.0.0",
-    "stripe": "^22.0.0"
+    "stripe": "^22.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitest/coverage-v8": "^4.1.4",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "nodemon": "^3.0.0",
+    "prettier": "^3.8.1",
+    "vitest": "^4.1.4"
   }
 }
