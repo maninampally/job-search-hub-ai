@@ -213,7 +213,9 @@ body {
 }
 
 .menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
   text-align: left;
   background: transparent;
@@ -228,6 +230,16 @@ body {
   transition: background 0.18s, color 0.18s;
   box-shadow: none;
   letter-spacing: 0.005em;
+}
+
+.menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  opacity: 0.92;
 }
 
 .menu-item:hover:not(:disabled) {
@@ -260,15 +272,90 @@ body {
 
 .sidebar-footer p { margin: 0.125rem 0; }
 
+.sidebar-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.sidebar-user-avatar {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(199, 210, 254, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sidebar-user-initial {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1;
+  user-select: none;
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-user-name {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e7ff;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-tagline {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: rgba(196, 181, 253, 0.92);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-tier-row {
+  display: block;
+  margin-top: 0.25rem;
+}
+
 .sidebar-account-actions {
-  margin-top: 0.625rem;
+  margin-top: 0.75rem;
   display: flex;
   gap: 0.375rem;
 }
 
 .sidebar-account-actions button {
   flex: 1;
-  padding: 0.375rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.5rem;
   font-size: 0.77rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(165, 180, 252, 0.15);

@@ -3,11 +3,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
   MdDashboard, MdWork, MdDescription, MdPeople, MdEmail, MdPsychology,
-  MdCampaign, MdNotifications, MdSearch, MdPerson, MdLogout,
+  MdCampaign, MdNotifications, MdSearch, MdPerson, MdLogout, MdSettings,
 } from "react-icons/md";
+import { TierBadge } from "../components/shared/TierBadge";
 import {
   BACKEND_URL,
   createContact,
+  deleteOtherSessions,
+  deleteSession,
   disconnectGmail,
   getAuthStatus,
   getHealth,
@@ -18,8 +21,12 @@ import {
   getContacts,
   getReminders,
   getOutreach,
+  getSessions,
+  startGmailOAuthFlow,
   syncJobs,
   getSyncStatus,
+  updateMyProfile,
+  disableMFA,
 } from "../api/backend";
 import { mergeEmails } from "../utils/emailUtils";
 import JobTrackerView from "../components/views/JobTrackerView";
@@ -29,6 +36,7 @@ import InterviewPrepView from "../components/views/InterviewPrepView";
 import OutreachView from "../components/views/OutreachView";
 import RemindersView from "../components/views/RemindersView";
 import DashboardHomeView from "../components/views/DashboardHomeView";
+import { SettingsPage } from "../components/views/SettingsPage";
 import { ResumesManager } from "../components/ResumesManager";
 import { INTERVIEW_QUESTIONS } from "./dashboard/interviewData";
 import { getPathForView, NAV_ITEMS } from "./dashboard/routeConfig";
@@ -54,16 +62,21 @@ const NAV_ICONS = {
   "Interview Prep": <MdPsychology size={17} />,
   "Outreach":       <MdCampaign size={17} />,
   "Reminders":      <MdNotifications size={17} />,
+  "Settings":       <MdSettings size={17} />,
 };
 
 export function DashboardPage({ routeView = "Dashboard" }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const openModal = useUIStore((s) => s.openModal);
+  const toastError = useUIStore((s) => s.error);
 
   const [activeView, setActiveView] = useState(routeView);
   const [isHealthy, setIsHealthy] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [gmailSyncAllowed, setGmailSyncAllowed] = useState(true);
+  const [settingsSessions, setSettingsSessions] = useState([]);
   const [lastChecked, setLastChecked] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [resumes, setResumes] = useState([]);
@@ -88,11 +101,39 @@ export function DashboardPage({ routeView = "Dashboard" }) {
 
   const connectedFromCallback = useMemo(() => {
     const params = new URLSearchParams(location.search);
-    return params.get("connected") === "true";
+    return (
+      params.get("connected") === "true" ||
+      params.get("gmail_connected") === "true"
+    );
   }, [location.search]);
 
   const userDisplayName = String(user?.name || "").trim() || String(user?.email || "").trim() || "there";
   const firstName = userDisplayName.split(" ")[0] || userDisplayName;
+  /** Sidebar: first line is first name only; avatar gradient seed uses full display name */
+  const sidebarCandidateName = String(user?.name || "").trim() || "Member";
+  const sidebarFirstName =
+    (String(user?.name || "").trim() && String(user?.name || "").trim().split(/\s+/)[0]) ||
+    firstName ||
+    "Member";
+  const sidebarHeadline = String(user?.headline || "").trim();
+  const sidebarTagline = sidebarHeadline
+    ? `Looking for roles (${sidebarHeadline})`
+    : "Add your target role in Profile";
+  const sidebarInitial = (sidebarFirstName.charAt(0) || "M").toUpperCase();
+  const sidebarAvatarUrl = String(user?.avatar_url || user?.photo_url || "").trim();
+
+  const sidebarAvatarFallbackStyle = useMemo(() => {
+    let h = 0;
+    const seed = sidebarCandidateName || "user";
+    for (let i = 0; i < seed.length; i += 1) {
+      h = seed.charCodeAt(i) + ((h << 5) - h);
+    }
+    const hue = Math.abs(h) % 360;
+    const hue2 = (hue + 48) % 360;
+    return {
+      background: `linear-gradient(135deg, hsl(${hue}, 58%, 42%) 0%, hsl(${hue2}, 52%, 32%) 100%)`,
+    };
+  }, [sidebarCandidateName]);
   const userScopedEmailReadKey = `${EMAIL_READ_STORAGE_KEY}:${user?.id || "guest"}`;
   const userScopedInterviewKey = `${INTERVIEW_STORAGE_KEY}:${user?.id || "guest"}`;
 
@@ -123,6 +164,22 @@ export function DashboardPage({ routeView = "Dashboard" }) {
   useEffect(() => {
     if (routeView !== activeView) setActiveView(routeView);
   }, [routeView]);
+
+  useEffect(() => {
+    if (activeView !== "Settings") return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getSessions();
+        if (!cancelled) setSettingsSessions(data.sessions || []);
+      } catch {
+        if (!cancelled) setSettingsSessions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeView]);
 
   const normalizedGlobalSearch = globalSearchQuery.trim().toLowerCase();
 
@@ -317,6 +374,11 @@ export function DashboardPage({ routeView = "Dashboard" }) {
       setIsHealthy(health.status === "ok");
       setConnected(Boolean(auth.connected));
       setLastChecked(jobsPayload.lastChecked || auth.lastChecked || null);
+      setGmailSyncAllowed(
+        Object.prototype.hasOwnProperty.call(auth, "gmailSyncAllowed")
+          ? Boolean(auth.gmailSyncAllowed)
+          : true
+      );
 
       const mergedJobs = mergeJobsById(jobs, jobsPayload.jobs || []);
       setJobs(mergedJobs);
@@ -355,53 +417,109 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     }
   }
 
-  async function handleSync() {
+  async function handleSync(options = {}) {
+    const fullWindow = Boolean(options.fullWindow);
+    const lookbackDays =
+      options.lookbackDays != null && Number.isFinite(Number(options.lookbackDays))
+        ? Math.min(365, Math.max(1, Math.floor(Number(options.lookbackDays))))
+        : undefined;
     setSyncing(true);
     setErrorText("");
     setSuccessText("");
 
     try {
-      const started = await syncJobs();
+      // Force one-time reprocess so previously skipped/failed emails can be reconsidered.
+      const started = await syncJobs({
+        forceReprocess: true,
+        fullWindow,
+        processAll: true,
+        ...(lookbackDays != null ? { lookbackDays } : {}),
+      });
       if (started?.error && !started?.isSyncing) {
         throw new Error(started.error);
       }
 
-      // Poll until sync finishes (max 10 minutes)
+      // Poll until sync finishes (max 10 minutes).
+      // We must not treat "isSyncing: false" on the first tick as completion before the server sets the lock.
+      // POST already returned { started: true } — treat that as "a sync was requested" and wait until idle.
+      let finalStatus = null;
       await new Promise((resolve) => {
         const deadline = Date.now() + 10 * 60 * 1000;
-        const poll = setInterval(async () => {
+        let sawSyncActivity = Boolean(started?.started);
+        let pollTimer = null;
+
+        const finish = (status) => {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+          finalStatus = status;
+          resolve();
+        };
+
+        const tick = async () => {
           try {
             const status = await getSyncStatus();
-            if (!status.isSyncing || Date.now() >= deadline) {
-              clearInterval(poll);
-              resolve();
+            if (status?.isSyncing) {
+              sawSyncActivity = true;
+            }
+            const timedOut = Date.now() >= deadline;
+            const idleAfterStart = sawSyncActivity && !status?.isSyncing;
+            if (timedOut || idleAfterStart) {
+              finish(status);
             }
           } catch {
-            clearInterval(poll);
-            resolve();
+            finish({ isSyncing: false, lastResult: null });
           }
-        }, 2000);
+        };
+
+        tick();
+        pollTimer = setInterval(tick, 500);
       });
 
-      // Reload jobs after sync completes
-      const payload = await getJobs();
-      const mergedJobs = mergeJobsById(jobs, payload.jobs || []);
-      setJobs(mergedJobs);
+      if (finalStatus?.lastResult?.error) {
+        throw new Error(`Sync failed: ${finalStatus.lastResult.error}. Reconnect Gmail and try again.`);
+      }
 
-      const autoContactResult = await syncAutoContactsToApi(contacts, mergedJobs);
+      // Reload jobs after sync completes (functional update avoids stale closure over `jobs`)
+      const payload = await getJobs();
+      const incoming = payload.jobs || [];
+      let mergedSnapshot = [];
+      setJobs((prev) => {
+        mergedSnapshot = mergeJobsById(prev, incoming);
+        return mergedSnapshot;
+      });
+
+      const autoContactResult = await syncAutoContactsToApi(contacts, mergedSnapshot);
       if (autoContactResult.addedCount > 0) setContacts(autoContactResult.nextContacts);
 
       setLastChecked(payload.lastChecked || null);
+      const processed = Number(finalStatus?.lastResult?.processed || 0);
+      const moreInGmail = Boolean(finalStatus?.lastResult?.hasMoreGmailResults);
+      const capHint = moreInGmail
+        ? " Gmail has more matching messages than this run's limit (raise INITIAL_SYNC_MAX_MESSAGES or run sync again after jobs save)."
+        : "";
       setSuccessText(
         autoContactResult.addedCount > 0
-          ? `Sync completed. ${autoContactResult.addedCount} recruiter contact(s) auto-added.`
-          : "Sync completed."
+          ? `Sync completed${fullWindow ? " (wide window: last month of matching mail)" : ""}. ${processed} email(s) processed and ${autoContactResult.addedCount} recruiter contact(s) auto-added.${capHint}`
+          : `Sync completed${fullWindow ? " (wide window: last month of matching mail)" : ""}. ${processed} email(s) processed.${capHint}`
       );
     } catch (error) {
       setErrorText(error.message || "Sync failed.");
     } finally {
       setSyncing(false);
     }
+  }
+
+  function handleRunSyncPreset(preset) {
+    const key = String(preset || "now").toLowerCase();
+    if (key === "6m") return handleSync({ fullWindow: true, lookbackDays: 180 });
+    if (key === "3m") return handleSync({ fullWindow: true, lookbackDays: 90 });
+    if (key === "1m") return handleSync({ fullWindow: true, lookbackDays: 30 });
+    if (key === "1w") return handleSync({ fullWindow: true, lookbackDays: 7 });
+    if (key === "3d") return handleSync({ fullWindow: true, lookbackDays: 3 });
+    if (key === "1d") return handleSync({ fullWindow: true, lookbackDays: 1 });
+    return handleSync();
   }
 
   async function handleChangeDailyRange(days, customStartDate = null, customEndDate = null) {
@@ -434,9 +552,31 @@ export function DashboardPage({ routeView = "Dashboard" }) {
     }
   }
 
-  function handleConnectGmail() {
-    const userId = user?.id || "";
-    window.location.href = `${BACKEND_URL}/auth/gmail?userId=${encodeURIComponent(userId)}`;
+  async function handleConnectGmail() {
+    setErrorText("");
+    setSuccessText("");
+    try {
+      const body = await startGmailOAuthFlow();
+      if (body?.redirectUrl) {
+        window.location.href = body.redirectUrl;
+      }
+    } catch (err) {
+      if (err.status === 402 && err.body?.error === "upgrade_required") {
+        openModal("upgrade", {
+          minTier: err.body.min_tier || "pro",
+          feature: err.body.feature || "gmail_sync",
+        });
+        return;
+      }
+      const base = err.message || "Could not start Gmail connection.";
+      const callbackUrl = `${BACKEND_URL}/auth/callback`;
+      const hint =
+        " If Google shows Error 400: redirect_uri_mismatch, open Google Cloud Console → APIs & Services → Credentials → your OAuth client → Authorized redirect URIs, and add exactly: " +
+        callbackUrl +
+        " (it must match REDIRECT_URI in your server .env).";
+      setErrorText(base);
+      toastError(base + hint, 12000);
+    }
   }
 
   function handleViewChange(view) {
@@ -493,11 +633,23 @@ export function DashboardPage({ routeView = "Dashboard" }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user-row">
-            <div className="sidebar-user-avatar">{firstName.charAt(0).toUpperCase()}</div>
+          <div className="sidebar-profile-card">
+            <div
+              className="sidebar-user-avatar"
+              style={sidebarAvatarUrl ? undefined : sidebarAvatarFallbackStyle}
+            >
+              {sidebarAvatarUrl ? (
+                <img src={sidebarAvatarUrl} alt="" className="sidebar-user-avatar-img" />
+              ) : (
+                <span className="sidebar-user-initial">{sidebarInitial}</span>
+              )}
+            </div>
             <div className="sidebar-user-info">
-              <span className="sidebar-user-name">{userDisplayName}</span>
-              {user?.email && <span className="sidebar-user-email">{user.email}</span>}
+              <span className="sidebar-user-name">{sidebarFirstName}</span>
+              <span className="sidebar-user-tagline">{sidebarTagline}</span>
+              <span className="sidebar-tier-row">
+                <TierBadge tier={user?.role || "free"} size="sm" />
+              </span>
             </div>
           </div>
           <div className="sidebar-account-actions">
@@ -522,6 +674,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             syncing={syncing}
             connected={connected}
             connectedFromCallback={connectedFromCallback}
+            gmailSyncAllowed={gmailSyncAllowed}
             successText={successText}
             errorText={errorText}
             stats={stats}
@@ -531,13 +684,52 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             needsFollowUpJobs={jobActions.needsFollowUpJobs}
             pipelineColumns={pipelineColumns}
             dailyApplicationsSeries={dailyApplicationsSeries}
-            isEmailVerified={user?.is_email_verified || false}
             onChangeDailyRange={handleChangeDailyRange}
             onRefresh={loadDashboard}
-            onConnectGmail={handleConnectGmail}
-            onDisconnect={handleDisconnect}
-            onSync={handleSync}
+            onRunSyncPreset={handleRunSyncPreset}
             onNavigateView={handleViewChange}
+            onOpenBilling={() => navigate("/billing")}
+          />
+        )}
+        {activeView === "Settings" && (
+          <SettingsPage
+            user={{
+              ...user,
+              googleConnected: connected,
+            }}
+            mfaEnabled={Boolean(user?.totp_enabled)}
+            sessions={settingsSessions}
+            gmailSyncAllowed={gmailSyncAllowed}
+            alertError={errorText}
+            alertSuccess={successText}
+            onOpenBilling={() => navigate("/billing")}
+            onUpdateProfile={async ({ name }) => {
+              await updateMyProfile({ name });
+              await refreshUser();
+            }}
+            onEnableMFA={() => openModal("mfaSetup")}
+            onDisableMFA={async () => {
+              const code = window.prompt("Enter your authenticator code to turn off MFA.");
+              if (!code?.trim()) return;
+              await disableMFA(code.trim());
+              await refreshUser();
+            }}
+            onEndSession={async (sessionId) => {
+              await deleteSession(sessionId);
+              const data = await getSessions();
+              setSettingsSessions(data.sessions || []);
+            }}
+            onEndAllSessions={async () => {
+              await deleteOtherSessions();
+              const data = await getSessions();
+              setSettingsSessions(data.sessions || []);
+            }}
+            onConnectGoogle={handleConnectGmail}
+            onDisconnectGoogle={handleDisconnect}
+            onDeleteAccount={() => {
+              setErrorText("Account deletion is not available in the app yet. Contact support.");
+            }}
+            onEmailExtractionSuccess={loadDashboard}
           />
         )}
         {activeView === "Job Tracker" && (
@@ -571,7 +763,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             onSaveJob={jobActions.handleSaveJob}
             onJobInput={jobActions.handleJobInput}
             onCancelEditJob={jobActions.handleCancelEditJob}
-            onSync={handleSync}
+            onRunSyncPreset={handleRunSyncPreset}
             onLoadDashboard={loadDashboard}
             onAttachResume={jobActions.handleAttachResume}
             onEmailCardDoubleClick={jobActions.handleEmailCardDoubleClick}

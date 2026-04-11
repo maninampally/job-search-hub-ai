@@ -55,14 +55,28 @@ export function CommandPalette() {
         {
           name: 'Dashboard',
           action: () => {
-            navigate('/');
+            navigate('/dashboard');
             toggleCommandPalette();
           },
         },
         {
           name: 'Jobs Tracker',
           action: () => {
-            navigate('/jobs');
+            navigate('/jobtracker/settings');
+            toggleCommandPalette();
+          },
+        },
+        {
+          name: 'Contacts',
+          action: () => {
+            navigate('/contacts/list');
+            toggleCommandPalette();
+          },
+        },
+        {
+          name: 'Resumes',
+          action: () => {
+            navigate('/resumes');
             toggleCommandPalette();
           },
         },

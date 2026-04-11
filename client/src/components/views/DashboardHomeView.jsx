@@ -5,12 +5,9 @@ const CARD_ITEMS = [
   { label: "Contacts", key: "contacts", tone: "tone-gold" },
 ];
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Line } from "recharts";
-import EmailExtractionVerification from "../EmailExtractionVerification.jsx";
-import { OnboardingChecklist } from "../shared/OnboardingChecklist.jsx";
-import { ActivityFeed } from "../shared/ActivityFeed.jsx";
-import "../emailExtractionVerification.css";
+import { getDailyReport } from "../../api/backend";
 
 export default function DashboardHomeView({
   greetingText,
@@ -21,6 +18,7 @@ export default function DashboardHomeView({
   syncing,
   connected,
   connectedFromCallback,
+  gmailSyncAllowed = true,
   successText,
   errorText,
   stats,
@@ -30,13 +28,11 @@ export default function DashboardHomeView({
   needsFollowUpJobs,
   pipelineColumns,
   dailyApplicationsSeries,
-  isEmailVerified,
   onRefresh,
-  onConnectGmail,
-  onDisconnect,
-  onSync,
+  onRunSyncPreset,
   onNavigateView,
   onChangeDailyRange,
+  onOpenBilling,
 }) {
   const [selectedDaysRange, setSelectedDaysRange] = useState(7);
   const [isCustomRange, setIsCustomRange] = useState(false);
@@ -46,7 +42,22 @@ export default function DashboardHomeView({
   const [customEndDate, setCustomEndDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [showEmailExtraction, setShowEmailExtraction] = useState(false);
+  const [syncPreset, setSyncPreset] = useState("now");
+  const [dailyReport, setDailyReport] = useState(null);
+  const [dailyReportLoading, setDailyReportLoading] = useState(false);
+  const [dailyReportHours, setDailyReportHours] = useState(24);
+
+  const fetchDailyReport = useCallback(async (hours) => {
+    setDailyReportLoading(true);
+    try {
+      const res = await getDailyReport(hours);
+      if (res.ok) setDailyReport(res.data);
+    } catch { /* ignore */ }
+    setDailyReportLoading(false);
+  }, []);
+
+  useEffect(() => { fetchDailyReport(dailyReportHours); }, [dailyReportHours, fetchDailyReport]);
+
   const followUpRate = stats.active > 0
     ? Math.round((needsFollowUpJobs.length / stats.active) * 100)
     : 0;
@@ -94,43 +105,65 @@ export default function DashboardHomeView({
         </article>
       </section>
 
-      <section className="sync-box">
+      <section className="sync-box inbox-summary">
         <div>
-          <h3>Gmail Auto Sync</h3>
+          <h3>Backend and inbox</h3>
           <p>
-            {isHealthy
-              ? `Backend is connected at ${BACKEND_URL}.`
-              : "Deploy backend first, then update your BACKEND URL to start live sync."}
+            {isHealthy ? (
+              <>
+                API is reachable at {BACKEND_URL}. Gmail:{" "}
+                <strong>{connected ? "connected" : "not connected"}</strong>
+                {!gmailSyncAllowed && " (upgrade required for sync)"}. Manage Gmail, disconnect, and email
+                extraction under Settings.
+              </>
+            ) : (
+              <>
+                Point <code>VITE_BACKEND_URL</code> at your API and ensure it is running. Current target:{" "}
+                {BACKEND_URL}.
+              </>
+            )}
           </p>
         </div>
-        <span className="sync-badge">{isHealthy ? "Backend Connected" : "Set BACKEND URL first"}</span>
-      </section>
-
-      <section className="control-row">
-        <button type="button" onClick={onRefresh} disabled={loading}>
-          Refresh
-        </button>
-        <button
-          type="button"
-          onClick={onConnectGmail}
-          disabled={!isEmailVerified || !isHealthy}
-          title={!isEmailVerified ? "Verify your email in Profile first" : "Connect Gmail account"}
-        >
-          {connected ? "Gmail Connected" : "Connect Gmail"}
-        </button>
-        <button type="button" onClick={onDisconnect} disabled={!connected}>
-          Disconnect
-        </button>
-        <button type="button" onClick={onSync} disabled={!connected || syncing || !isEmailVerified}>
-          {syncing ? "Syncing..." : "Sync Jobs"}
-        </button>
-        <button 
-          type="button" 
-          onClick={() => setShowEmailExtraction(true)}
-          title="Enable email extraction verification"
-        >
-          Enable Email Extraction
-        </button>
+        <div className="inbox-summary-actions" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+          <span className="sync-badge">{isHealthy ? "Backend ready" : "Check backend"}</span>
+          <button type="button" onClick={onRefresh} disabled={loading}>
+            Refresh data
+          </button>
+          <button type="button" onClick={() => onNavigateView("Settings")}>
+            Open Settings
+          </button>
+          {gmailSyncAllowed && connected && (
+            <>
+              <select
+                value={syncPreset}
+                onChange={(event) => setSyncPreset(event.target.value)}
+                disabled={syncing}
+                title="Choose sync window"
+              >
+                <option value="now">Sync now (since last auto sync)</option>
+                <option value="6m">Sync 6M</option>
+                <option value="3m">Sync 3M</option>
+                <option value="1m">Sync 1M</option>
+                <option value="1w">Sync 1W</option>
+                <option value="3d">Sync 3D</option>
+                <option value="1d">Sync 1D</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => typeof onRunSyncPreset === "function" && onRunSyncPreset(syncPreset)}
+                disabled={syncing || typeof onRunSyncPreset !== "function"}
+                title="Run selected sync window"
+              >
+                {syncing ? "Syncing…" : "Run sync"}
+              </button>
+            </>
+          )}
+          {!gmailSyncAllowed && (
+            <button type="button" onClick={onOpenBilling}>
+              View plans
+            </button>
+          )}
+        </div>
       </section>
 
       {connectedFromCallback && <div className="inline-note success">Gmail connected successfully.</div>}
@@ -257,6 +290,103 @@ export default function DashboardHomeView({
         </div>
       </section>
 
+      <section className="block daily-report-section">
+        <div className="chart-header">
+          <h3>Daily Sync Report</h3>
+          <select
+            value={dailyReportHours}
+            onChange={(e) => setDailyReportHours(Number(e.target.value))}
+            className="range-selector"
+          >
+            <option value={12}>Last 12 Hours</option>
+            <option value={24}>Last 24 Hours</option>
+            <option value={48}>Last 48 Hours</option>
+            <option value={72}>Last 3 Days</option>
+            <option value={168}>Last 7 Days</option>
+          </select>
+        </div>
+        {dailyReportLoading ? (
+          <p className="muted">Loading report...</p>
+        ) : !dailyReport ? (
+          <p className="muted">No report data available. Run a sync first.</p>
+        ) : (
+          <>
+            <div className="weekly-kpis" style={{ marginBottom: "1rem" }}>
+              <article className="weekly-kpi kpi-indigo">
+                <p>Emails Processed</p>
+                <strong>{dailyReport.summary?.emailsProcessed ?? 0}</strong>
+              </article>
+              <article className="weekly-kpi kpi-teal">
+                <p>Jobs Created</p>
+                <strong>{dailyReport.summary?.jobsCreated ?? 0}</strong>
+              </article>
+              <article className="weekly-kpi kpi-violet">
+                <p>Status Changes</p>
+                <strong>{dailyReport.summary?.statusChanges ?? 0}</strong>
+              </article>
+            </div>
+
+            {dailyReport.emailsByType && Object.keys(dailyReport.emailsByType).length > 0 && (
+              <div style={{ marginBottom: "1rem" }}>
+                <h4 style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Emails by Type</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {Object.entries(dailyReport.emailsByType).map(([type, count]) => (
+                    <span key={type} className="focus-pill">{type}: {count}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {dailyReport.newJobs && dailyReport.newJobs.length > 0 && (
+              <div style={{ marginBottom: "1rem" }}>
+                <h4 style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>New Jobs</h4>
+                <ul>
+                  {dailyReport.newJobs.map((j, i) => (
+                    <li key={i}>
+                      <strong>{j.role || "Unknown Role"}</strong> at {j.company || "N/A"} - {j.status}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {dailyReport.statusChanges && dailyReport.statusChanges.length > 0 && (
+              <div style={{ marginBottom: "1rem" }}>
+                <h4 style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Status Changes</h4>
+                <ul>
+                  {dailyReport.statusChanges.map((sc, i) => (
+                    <li key={i}>
+                      <strong>{sc.company}</strong> - {sc.role}: {sc.from || "New"} → {sc.to}
+                      <span className="muted" style={{ marginLeft: "0.5rem", fontSize: "0.8rem" }}>
+                        {new Date(sc.date).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {dailyReport.recentEmails && dailyReport.recentEmails.length > 0 && (
+              <details>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                  Recent Emails ({dailyReport.recentEmails.length})
+                </summary>
+                <ul style={{ marginTop: "0.5rem" }}>
+                  {dailyReport.recentEmails.map((em, i) => (
+                    <li key={i} style={{ marginBottom: "0.25rem" }}>
+                      <strong>{em.company}</strong> - {em.subject?.slice(0, 60)}
+                      <span className="muted" style={{ marginLeft: "0.5rem", fontSize: "0.8rem" }}>
+                        {em.type} - {new Date(em.date).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
+        )}
+      </section>
+
       <section className="two-col">
         <article className="block">
           <h3>Recent Applications</h3>
@@ -338,17 +468,6 @@ export default function DashboardHomeView({
         </button>
       </section>
 
-      {showEmailExtraction && (
-        <div className="modal-overlay">
-          <EmailExtractionVerification
-            onSuccess={() => {
-              setShowEmailExtraction(false);
-              onRefresh();
-            }}
-            onCancel={() => setShowEmailExtraction(false)}
-          />
-        </div>
-      )}
     </>
   );
 }

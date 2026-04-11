@@ -4,7 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { SessionsPanel } from "../components/auth/SessionsPanel";
 import { MFASetupModal } from "../components/auth/MFASetupModal";
 import { useUIStore } from "../stores/uiStore";
-import { updateMyProfile, changePassword, requestEmailVerification, confirmEmailVerification } from "../api/backend";
+import { updateMyProfile, changePassword } from "../api/backend";
 
 export default function ProfilePage() {
   const { user, refreshUser, logout } = useAuth();
@@ -22,10 +22,6 @@ export default function ProfilePage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState("");
   const [pwError, setPwError] = useState("");
-  const [requestingVerification, setRequestingVerification] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState("");
-  const [verificationError, setVerificationError] = useState("");
-
   useEffect(() => {
     setForm({
       name: user?.name || "",
@@ -79,20 +75,6 @@ export default function ProfilePage() {
   function handleLogout() {
     logout();
     navigate("/login", { replace: true });
-  }
-
-  async function handleRequestVerificationEmail() {
-    setVerificationError("");
-    setVerificationMessage("");
-    setRequestingVerification(true);
-    try {
-      await requestEmailVerification();
-      setVerificationMessage("Verification email sent. Check your inbox for the confirmation link.");
-    } catch (err) {
-      setVerificationError(err.message || "Failed to send verification email.");
-    } finally {
-      setRequestingVerification(false);
-    }
   }
 
   return (
@@ -204,54 +186,26 @@ export default function ProfilePage() {
         </form>
 
         <div className="profile-form" style={{ marginTop: "2rem", borderTop: "1px solid var(--slate-200)", paddingTop: "2rem" }}>
-          <h2 style={{ marginBottom: "1rem" }}>Email Verification</h2>
-          {user?.email_verified_at ? (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
+          <h2 style={{ marginBottom: "1rem" }}>Account email and Gmail</h2>
+          <div
+            style={{
               padding: "1rem",
-              backgroundColor: "#dcfce7",
-              border: "1px solid #86efac",
+              backgroundColor: "#f8fafc",
+              border: "1px solid #e2e8f0",
               borderRadius: "0.5rem",
-              color: "#166534"
-            }}>
-              <span style={{ fontSize: "1.25rem" }}>✓</span>
-              <div>
-                <strong>Email Verified</strong>
-                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.875rem" }}>
-                  {user.email} • Verified on {new Date(user.email_verified_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p style={{ marginBottom: "1rem", color: "var(--text-secondary)" }}>
-                Verify your email address to unlock Gmail connection and job syncing features.
-              </p>
-              {verificationError && <div className="auth-error">{verificationError}</div>}
-              {verificationMessage && <div className="auth-success">{verificationMessage}</div>}
-              <button
-                type="button"
-                onClick={handleRequestVerificationEmail}
-                disabled={requestingVerification}
-                style={{
-                  padding: "0.5rem 1rem",
-                  backgroundColor: "var(--indigo-600)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "0.375rem",
-                  cursor: requestingVerification ? "not-allowed" : "pointer",
-                  opacity: requestingVerification ? 0.6 : 1
-                }}
-              >
-                {requestingVerification ? "Sending..." : "Send Verification Email"}
-              </button>
-              <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "0.75rem" }}>
-                We'll send a confirmation link to {user?.email}
-              </p>
-            </div>
-          )}
+              color: "#334155",
+              fontSize: "0.9rem",
+              lineHeight: 1.6,
+            }}
+          >
+            <p style={{ margin: "0 0 0.75rem 0" }}>
+              <strong>Sign-in email:</strong> {user?.email}
+            </p>
+            <p style={{ margin: 0 }}>
+              Gmail sync uses your own OAuth tokens and only reads mail for the Google account whose address matches this email.
+              One Hub account maps to one connected inbox. If you pick a different Google account during connect, the app will reject it.
+            </p>
+          </div>
         </div>
       </div>
     </div>

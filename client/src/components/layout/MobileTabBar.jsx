@@ -6,7 +6,7 @@ const MOBILE_TABS = [
   { label: "Jobs",     view: "Job Tracker" },
   { label: "Contacts", view: "Contacts" },
   { label: "Remind",   view: "Reminders" },
-  { label: "More",     view: "Templates" },
+  { label: "Settings", view: "Settings" },
 ];
 
 export function MobileTabBar({ activeView, onNavigate }) {

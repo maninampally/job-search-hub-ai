@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getJobTimeline } from '../../api/backend';
 import styles from './JobDetailDrawer.module.css';
 
 const TABS = [
@@ -44,7 +45,6 @@ export function JobDetailDrawer({
   if (!job) return null;
 
   const emails = job.emails || [];
-  const timeline = job.timeline || generateTimeline(job);
   const statusClass = `status${job.status?.replace(/\s/g, '') || 'Wishlist'}`;
 
   return (
@@ -118,7 +118,7 @@ export function JobDetailDrawer({
             <EmailsTab emails={emails} />
           )}
           {activeTab === 'timeline' && (
-            <TimelineTab timeline={timeline} />
+            <UnifiedTimelineTab jobId={job.id} />
           )}
           {activeTab === 'actions' && (
             <ActionsTab 
@@ -250,19 +250,39 @@ function EmailsTab({ emails }) {
 }
 
 /**
- * Timeline Tab
+ * Unified Timeline Tab - fetches status changes + emails from backend
  */
-function TimelineTab({ timeline }) {
+function UnifiedTimelineTab({ jobId }) {
+  const [timeline, setTimeline] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    setLoading(true);
+    getJobTimeline(jobId)
+      .then((res) => {
+        if (!cancelled) setTimeline(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setTimeline([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [jobId]);
+
+  if (loading) {
+    return <div className={styles.emptyState}><div className={styles.emptyText}>Loading timeline...</div></div>;
+  }
+
   if (timeline.length === 0) {
     return (
       <div className={styles.emptyState}>
-        <div className={styles.emptyIcon}>
-          <ClockIcon />
-        </div>
+        <div className={styles.emptyIcon}><ClockIcon /></div>
         <div className={styles.emptyTitle}>No activity yet</div>
-        <div className={styles.emptyText}>
-          Timeline events will appear as your application progresses
-        </div>
+        <div className={styles.emptyText}>Timeline events will appear as your application progresses</div>
       </div>
     );
   }
@@ -270,14 +290,27 @@ function TimelineTab({ timeline }) {
   return (
     <div className={styles.timeline}>
       {timeline.map((event, index) => (
-        <div 
-          key={index} 
-          className={`${styles.timelineItem} ${index === 0 ? styles.current : ''}`}
+        <div
+          key={index}
+          className={`${styles.timelineItem} ${index === timeline.length - 1 ? styles.current : ''}`}
         >
-          <div className={styles.timelineDot} />
-          <div className={styles.timelineDate}>{formatDate(event.date)}</div>
-          <div className={styles.timelineContent}>{event.title}</div>
-          {event.note && <div className={styles.timelineNote}>{event.note}</div>}
+          <div className={styles.timelineDot} style={event.type === 'email' ? { background: '#6366f1' } : { background: '#10b981' }} />
+          <div className={styles.timelineDate}>{formatDateTime(event.date)}</div>
+          <div className={styles.timelineContent}>
+            {event.type === 'email' ? (
+              <>
+                <strong style={{ fontSize: '11px', color: '#6366f1', textTransform: 'uppercase' }}>Email</strong>
+                <span style={{ marginLeft: 6 }}>{event.title}</span>
+                {event.from && <div style={{ fontSize: '12px', color: '#6b7280' }}>From: {event.from}</div>}
+              </>
+            ) : (
+              <>
+                <strong style={{ fontSize: '11px', color: '#10b981', textTransform: 'uppercase' }}>Status</strong>
+                <span style={{ marginLeft: 6 }}>{event.title}</span>
+                {event.detail && <div style={{ fontSize: '12px', color: '#6b7280' }}>{event.detail}</div>}
+              </>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -368,25 +401,16 @@ function formatDate(dateStr) {
   });
 }
 
-function generateTimeline(job) {
-  const events = [];
-  
-  if (job.created_at || job.appliedDate) {
-    events.push({
-      date: job.created_at || job.appliedDate,
-      title: 'Application added',
-      note: `Applied to ${job.company}`,
-    });
-  }
-
-  if (job.status === 'Screening' || job.status === 'Interview' || job.status === 'Offer') {
-    events.unshift({
-      date: new Date().toISOString(),
-      title: `Moved to ${job.status}`,
-    });
-  }
-
-  return events;
+function formatDateTime(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 // Icons

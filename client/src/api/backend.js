@@ -86,8 +86,18 @@ async function parseResponse(response) {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // Attach status and upgrade info for UpgradeModal to detect 402 responses
-    const err = new Error(body.error || `Request failed with status ${response.status}`);
+    let message = body.error || `Request failed with status ${response.status}`;
+    if (response.status === 429) {
+      if (body.message) message = body.message;
+      const reset = body.resetAt;
+      if (reset != null) {
+        const t = new Date(typeof reset === "number" ? reset : Number(reset));
+        if (!Number.isNaN(t.getTime())) {
+          message += ` Resets at ${t.toLocaleString()}.`;
+        }
+      }
+    }
+    const err = new Error(message);
     err.status = response.status;
     err.body = body;
     throw err;
@@ -186,6 +196,25 @@ export async function disconnectGmail() {
   return parseResponse(response);
 }
 
+/**
+ * Start Gmail OAuth from the logged-in SPA (sends Bearer token). Returns { redirectUrl } to open in the browser.
+ */
+export async function startGmailOAuthFlow() {
+  const response = await apiFetch(`${BACKEND_URL}/auth/gmail/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(body.error || "Failed to start Gmail connection");
+    err.status = response.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+
 // Session management
 export async function getSessions() {
   const response = await apiFetch(`${BACKEND_URL}/auth/sessions`);
@@ -211,9 +240,20 @@ export async function getJobs() {
   return parseResponse(response);
 }
 
-export async function syncJobs() {
+export async function syncJobs(options = {}) {
+  const forceReprocess = Boolean(options.forceReprocess);
+  const fullWindow = Boolean(options.fullWindow);
+  const processAll = Object.prototype.hasOwnProperty.call(options, "processAll")
+    ? Boolean(options.processAll)
+    : true;
+  const body = { forceReprocess, fullWindow, processAll };
+  if (options.lookbackDays != null && Number.isFinite(Number(options.lookbackDays))) {
+    body.lookbackDays = Math.min(365, Math.max(1, Math.floor(Number(options.lookbackDays))));
+  }
   const response = await apiFetch(`${BACKEND_URL}/jobs/sync`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   return parseResponse(response);
 }
@@ -264,6 +304,11 @@ export async function getJobTimeline(jobId) {
     success: true,
     data: Array.isArray(body?.timeline) ? body.timeline : [],
   };
+}
+
+export async function getDailyReport(hours = 24) {
+  const response = await apiFetch(`${BACKEND_URL}/jobs/daily-report?hours=${hours}`);
+  return parseResponse(response);
 }
 
 export async function markJobImported(jobId) {

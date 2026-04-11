@@ -1,14 +1,34 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import DashboardWrapper from "./pages/DashboardWrapper";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
-import ProfilePage from "./pages/ProfilePage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { useAuth } from "./auth/AuthContext";
-import { AdminDashboard } from "./components/admin/AdminDashboard";
-import { BillingPage } from "./components/views/BillingPage";
+import { UpgradeModal } from "./components/auth/UpgradeModal";
+import { MFASetupModal } from "./components/auth/MFASetupModal";
+import { Toast } from "./components/shared/Toast";
+import ErrorBoundary from "./components/shared/ErrorBoundary";
+import { SkeletonDashboard } from "./components/shared/SkeletonLoader";
 
-function ProtectedRoute({ children, requireVerified = true }) {
-  const { isAuthenticated, isInitializing, user } = useAuth();
+// Lazy load heavier pages - code splitting for performance
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
+const ConfirmEmailPage = lazy(() => import("./pages/ConfirmEmailPage"));
+const AdminDashboard = lazy(() => import("./components/admin/AdminDashboard"));
+const BillingPage = lazy(() => import("./components/views/BillingPage"));
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div style={{ padding: "2rem" }}>
+      <SkeletonDashboard />
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, isInitializing } = useAuth();
 
   if (isInitializing) {
     return <div className="auth-loading">Loading your workspace...</div>;
@@ -16,10 +36,6 @@ function ProtectedRoute({ children, requireVerified = true }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
-  }
-
-  if (requireVerified && !user?.is_email_verified) {
-    return <Navigate to="/verify-email" replace />;
   }
 
   return children;
@@ -43,6 +59,20 @@ function AdminRoute({ children }) {
   return children;
 }
 
+function HomeRedirect() {
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  if (isInitializing) {
+    return <div className="auth-loading">Loading...</div>;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <LandingPage />;
+}
+
 function PublicOnlyRoute({ children }) {
   const { isAuthenticated, isInitializing } = useAuth();
 
@@ -59,9 +89,16 @@ function PublicOnlyRoute({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <UpgradeModal />
+        <MFASetupModal />
+        <Toast />
+        <Routes>
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/terms" element={<Suspense fallback={<LoadingFallback />}><TermsPage /></Suspense>} />
+        <Route path="/privacy" element={<Suspense fallback={<LoadingFallback />}><PrivacyPage /></Suspense>} />
+        <Route path="/confirm-email" element={<Suspense fallback={<LoadingFallback />}><ConfirmEmailPage /></Suspense>} />
         <Route
           path="/login"
           element={
@@ -71,18 +108,12 @@ export default function App() {
           }
         />
         <Route
-          path="/verify-email"
-          element={
-            <ProtectedRoute requireVerified={false}>
-              <VerifyEmailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/profile"
           element={
             <ProtectedRoute>
-              <ProfilePage />
+              <Suspense fallback={<LoadingFallback />}>
+                <ProfilePage />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -90,7 +121,9 @@ export default function App() {
           path="/billing"
           element={
             <ProtectedRoute>
-              <BillingPage />
+              <Suspense fallback={<LoadingFallback />}>
+                <BillingPage />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -98,7 +131,9 @@ export default function App() {
           path="/admin"
           element={
             <AdminRoute>
-              <AdminDashboard />
+              <Suspense fallback={<LoadingFallback />}>
+                <AdminDashboard />
+              </Suspense>
             </AdminRoute>
           }
         />
@@ -112,6 +147,7 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

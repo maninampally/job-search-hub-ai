@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   "Interview Prep",
   "Outreach",
   "Reminders",
+  "Settings",
 ];
 
 export const VIEW_ROUTE_MAP = {
@@ -18,6 +19,7 @@ export const VIEW_ROUTE_MAP = {
   "Interview Prep": "/interviewprep/questions",
   Outreach: "/outreach/followups",
   Reminders: "/reminders/today",
+  Settings: "/settings",
 };
 
 export function getPathForView(view) {

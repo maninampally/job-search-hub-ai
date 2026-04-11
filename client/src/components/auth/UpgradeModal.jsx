@@ -2,6 +2,8 @@ import React from 'react';
 import { useUIStore } from '../../stores/uiStore';
 import styles from './UpgradeModal.module.css';
 
+const EMPTY_DATA = {};
+
 const TIER_PRICING = {
   pro: {
     name: 'Pro',
@@ -35,7 +37,7 @@ const TIER_PRICING = {
  */
 export function UpgradeModal() {
   const isOpen = useUIStore((state) => state.modals.upgrade);
-  const modalData = useUIStore((state) => state.modalData.upgrade = {});
+  const modalData = useUIStore((state) => state.modalData.upgrade || EMPTY_DATA);
   const closeModal = useUIStore((state) => state.closeModal);
 
   const { minTier = 'pro', feature = 'this feature' } = modalData || {};

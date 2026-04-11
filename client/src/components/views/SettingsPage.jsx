@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { MdEmail } from 'react-icons/md';
+import EmailExtractionVerification from '../EmailExtractionVerification.jsx';
 import styles from './SettingsPage.module.css';
+import '../emailExtractionVerification.css';
 
 const TABS = [
   { key: 'account', label: 'Account' },
@@ -15,6 +18,10 @@ export function SettingsPage({
   user = {},
   mfaEnabled = false,
   sessions = [],
+  gmailSyncAllowed = true,
+  alertError = '',
+  alertSuccess = '',
+  onOpenBilling,
   onUpdateProfile,
   onEnableMFA,
   onDisableMFA,
@@ -23,13 +30,20 @@ export function SettingsPage({
   onConnectGoogle,
   onDisconnectGoogle,
   onDeleteAccount,
+  onEmailExtractionSuccess,
 }) {
   const [activeTab, setActiveTab] = useState('account');
   const [loading, setLoading] = useState(false);
+  const [showEmailExtraction, setShowEmailExtraction] = useState(false);
 
   // Form states
   const [name, setName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
+
+  useEffect(() => {
+    setName(user.name || '');
+    setEmail(user.email || '');
+  }, [user.name, user.email]);
 
   // Notification preferences
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -39,7 +53,7 @@ export function SettingsPage({
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      await onUpdateProfile?.({ name, email });
+      await onUpdateProfile?.({ name });
     } finally {
       setLoading(false);
     }
@@ -51,6 +65,17 @@ export function SettingsPage({
         <h1 className={styles.title}>Settings</h1>
         <p className={styles.subtitle}>Manage your account preferences and security</p>
       </header>
+
+      {alertSuccess ? (
+        <div className={styles.alertSuccess} role="status">
+          {alertSuccess}
+        </div>
+      ) : null}
+      {alertError ? (
+        <div className={styles.alertError} role="alert">
+          {alertError}
+        </div>
+      ) : null}
 
       {/* Tabs */}
       <div className={styles.tabs}>
@@ -90,9 +115,14 @@ export function SettingsPage({
                   type="email"
                   className={styles.input}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  readOnly
+                  disabled
+                  title="Sign-in email cannot be changed here"
                   placeholder="you@example.com"
                 />
+                <p className={styles.settingDescription} style={{ marginTop: '0.35rem' }}>
+                  This is your login email. It must match the Gmail account you connect for sync.
+                </p>
               </div>
               <div className={styles.footer}>
                 <button
@@ -271,22 +301,64 @@ export function SettingsPage({
             <h2 className={styles.sectionTitle}>Connected Services</h2>
           </div>
           <div className={styles.sectionContent}>
+            <p className={styles.settingDescription} style={{ marginBottom: '1rem' }}>
+              <strong>Connect Gmail</strong> authorizes read-only access so we can import job-related messages into your
+              tracker. <strong>Email extraction verification</strong> is a separate optional step for verified
+              email-bound features.
+            </p>
+            {!gmailSyncAllowed && (
+              <p className={styles.settingDescription} style={{ marginBottom: '1rem' }}>
+                Gmail sync requires Pro or Elite (or an admin-enabled trial).{' '}
+                <button type="button" className={`${styles.button} ${styles.buttonSecondary}`} onClick={onOpenBilling}>
+                  View plans
+                </button>
+              </p>
+            )}
+            <p className={styles.settingDescription} style={{ marginBottom: '1rem' }}>
+              If Google shows <strong>redirect_uri_mismatch</strong>, add your API callback URL to the OAuth client in
+              Google Cloud Console (Authorized redirect URIs). It must match <code>REDIRECT_URI</code> in your server
+              environment (for local Docker this is usually <code>http://localhost:3001/auth/callback</code>).
+            </p>
             <div className={styles.connectedApp}>
               <div className={styles.appIcon}>
                 <GoogleIcon />
               </div>
               <div className={styles.appInfo}>
-                <div className={styles.appName}>Google Account</div>
+                <div className={styles.appName}>Gmail (job sync)</div>
                 <div className={`${styles.appStatus} ${user.googleConnected ? styles.appStatusConnected : ''}`}>
                   {user.googleConnected ? 'Connected' : 'Not connected'}
                 </div>
               </div>
+              {gmailSyncAllowed || user.googleConnected ? (
+                <button
+                  type="button"
+                  className={`${styles.button} ${user.googleConnected ? styles.buttonDanger : styles.buttonPrimary}`}
+                  onClick={user.googleConnected ? onDisconnectGoogle : onConnectGoogle}
+                >
+                  {user.googleConnected ? 'Disconnect' : 'Connect Gmail'}
+                </button>
+              ) : (
+                <button type="button" className={`${styles.button} ${styles.buttonPrimary}`} onClick={onOpenBilling}>
+                  Upgrade for Gmail
+                </button>
+              )}
+            </div>
+            <div className={styles.connectedApp}>
+              <div className={styles.appIcon} aria-hidden>
+                <MdEmail size={22} />
+              </div>
+              <div className={styles.appInfo}>
+                <div className={styles.appName}>Email extraction verification</div>
+                <div className={styles.settingDescription}>
+                  Optional. Used for certain verified email flows. Not required to connect Gmail for sync.
+                </div>
+              </div>
               <button
                 type="button"
-                className={`${styles.button} ${user.googleConnected ? styles.buttonDanger : styles.buttonPrimary}`}
-                onClick={user.googleConnected ? onDisconnectGoogle : onConnectGoogle}
+                className={`${styles.button} ${styles.buttonSecondary}`}
+                onClick={() => setShowEmailExtraction(true)}
               >
-                {user.googleConnected ? 'Disconnect' : 'Connect'}
+                Set up
               </button>
             </div>
             <div className={styles.connectedApp}>
@@ -315,6 +387,18 @@ export function SettingsPage({
             </div>
           </div>
         </section>
+      )}
+
+      {showEmailExtraction && (
+        <div className="modal-overlay">
+          <EmailExtractionVerification
+            onSuccess={() => {
+              setShowEmailExtraction(false);
+              onEmailExtractionSuccess?.();
+            }}
+            onCancel={() => setShowEmailExtraction(false)}
+          />
+        </div>
       )}
     </div>
   );
