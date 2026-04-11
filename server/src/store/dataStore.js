@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { env } = require("../config/env");
+const { logger } = require("../utils/logger");
 
 const localStorePath = path.resolve(__dirname, "../../data/local-store.json");
 
@@ -134,15 +135,20 @@ async function addStatusChange(jobId, fromStatus, toStatus, trigger = "manual", 
   if (!jobId || !toStatus) return;
 
   if (supabase) {
-    const { error } = await supabase.from("job_status_timeline").insert({
-      job_id:      jobId,
-      owner_user_id: userId,
-      from_status: fromStatus || null,
-      to_status:   toStatus,
-      trigger,
-      changed_at:  new Date().toISOString(),
-    });
-    if (error) throw error;
+    try {
+      const response = await supabase.from("job_status_timeline").insert({
+        job_id:      jobId,
+        owner_user_id: userId,
+        from_status: fromStatus || null,
+        to_status:   toStatus,
+        trigger,
+        changed_at:  new Date().toISOString(),
+      });
+      validateSupabaseResponse(response, `addStatusChange for job ${jobId}`);
+    } catch (error) {
+      logger.error("addStatusChange Supabase query failed", { jobId, error: error.message });
+      throw error;
+    }
     return;
   }
 
@@ -202,6 +208,25 @@ const hasSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 const supabase = hasSupabase
   ? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
+
+/**
+ * Validate Supabase query response structure
+ * Throws meaningful error if response is malformed
+ */
+function validateSupabaseResponse(response, operationName = "database operation") {
+  if (!response) {
+    throw new Error(`${operationName}: Supabase returned null response`);
+  }
+  
+  const { data, error } = response;
+  
+  if (error) {
+    logger.error("Supabase query error", { operation: operationName, error: error.message });
+    throw error;
+  }
+  
+  return data;
+}
 
 async function getTokens() {
   if (!supabase) {
@@ -299,49 +324,67 @@ async function clearTokens() {
   }
 }
 
-async function getLastChecked() {
+/**
+ * Last successful Gmail job sync time for this user (stored on oauth_tokens).
+ * @param {string} userId
+ * @returns {Promise<string|null>}
+ */
+async function getLastChecked(userId) {
+  if (!userId) {
+    return null;
+  }
+
   if (!supabase) {
-    return memory.lastChecked;
+    const row = memory.userTokens?.[userId];
+    return row?.last_checked || null;
   }
 
   try {
     const { data, error } = await supabase
       .from("oauth_tokens")
       .select("last_checked")
-      .eq("id", 1)
+      .eq("owner_user_id", userId)
       .maybeSingle();
 
     if (error) {
-      // id=1 may not exist in per-user design, just return null
       return null;
     }
 
     return data?.last_checked || null;
-  } catch (err) {
-    // If query fails, just return null instead of crashing
-    console.warn("[getLastChecked] error:", err.message);
+  } catch {
     return null;
   }
 }
 
-async function setLastChecked(lastChecked) {
+/**
+ * @param {string} userId
+ * @param {string|null} lastChecked ISO string or null (e.g. on Gmail disconnect)
+ */
+async function setLastChecked(userId, lastChecked) {
+  if (!userId) {
+    return;
+  }
+
   if (!supabase) {
-    memory.lastChecked = lastChecked;
+    memory.userTokens = memory.userTokens || {};
+    if (!memory.userTokens[userId]) {
+      memory.userTokens[userId] = {};
+    }
+    memory.userTokens[userId].last_checked = lastChecked;
     saveLocalMemory(memory);
     return;
   }
 
-  const { error } = await supabase.from("oauth_tokens").upsert(
-    {
-      id: 1,
+  const { error } = await supabase
+    .from("oauth_tokens")
+    .update({
       last_checked: lastChecked,
       updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
+    })
+    .eq("owner_user_id", userId);
 
   if (error) {
-    throw error;
+    logger.error("setLastChecked failed", { userId, error: error.message });
   }
 }
 
@@ -425,6 +468,43 @@ async function addJob(job, options = {}) {
   });
 
   if (error) {
+    const message = String(error.message || "");
+    const duplicateEmailId = message.includes("jobs_email_id_key") || message.includes("duplicate key value");
+
+    // Existing row for same email_id: update the existing job instead of failing sync.
+    if (duplicateEmailId && job.emailId) {
+      const { data: existing, error: lookupError } = await supabase
+        .from("jobs")
+        .select("id,status")
+        .eq("email_id", job.emailId)
+        .maybeSingle();
+
+      if (lookupError) {
+        throw lookupError;
+      }
+
+      if (existing?.id) {
+        await updateJob(
+          existing.id,
+          {
+            company: job.company || null,
+            role: job.role || null,
+            status: job.status || "Applied",
+            location: job.location || null,
+            recruiterName: job.recruiterName || null,
+            recruiterEmail: job.recruiterEmail || null,
+            appliedDate: job.appliedDate || null,
+            notes: job.notes || null,
+            nextStep: job.nextStep || null,
+            source: job.source || "gmail",
+          },
+          { userId }
+        );
+        saveLocalMemory(memory);
+        return;
+      }
+    }
+
     throw error;
   }
 
@@ -585,14 +665,22 @@ async function markProcessedEmail(messageId, options = {}) {
     return;
   }
 
-  const { error } = await supabase.from("processed_emails").upsert(
-    {
-      owner_user_id: userId,
-      gmail_id: messageId,
-      processed_at: new Date().toISOString(),
-    },
-    { onConflict: "owner_user_id,gmail_id" }
-  );
+  const row = {
+    owner_user_id: userId,
+    gmail_id: messageId,
+    processed_at: new Date().toISOString(),
+  };
+
+  let { error } = await supabase.from("processed_emails").upsert(row, {
+    onConflict: "owner_user_id,gmail_id",
+  });
+
+  if (error && String(error.message || "").includes("no unique or exclusion constraint")) {
+    const retry = await supabase.from("processed_emails").upsert(row, {
+      onConflict: "gmail_id",
+    });
+    error = retry.error || null;
+  }
 
   if (error) {
     throw error;
@@ -640,10 +728,42 @@ async function saveJobEmail(jobId, email) {
   };
 
   if (gmailId) {
-    const { error } = await supabase
-      .from("job_emails")
-      .upsert(row, { onConflict: "owner_user_id,gmail_id" });
-    if (error) throw error;
+    // Partial unique index uidx_job_emails_owner_gmail breaks PostgREST upsert onConflict; use explicit write path.
+    const ownerId = email.ownerUserId || null;
+    let query = supabase.from("job_emails").select("id").eq("gmail_id", gmailId);
+    if (ownerId) {
+      query = query.eq("owner_user_id", ownerId);
+    }
+    const { data: existingRow, error: selErr } = await query.maybeSingle();
+    if (selErr) {
+      throw selErr;
+    }
+
+    if (existingRow?.id) {
+      const { error: upErr } = await supabase
+        .from("job_emails")
+        .update({
+          job_id: row.job_id,
+          subject: row.subject,
+          sender: row.sender,
+          sender_name: row.sender_name,
+          body_text: row.body_text,
+          preview: row.preview,
+          received_at: row.received_at,
+          email_type: row.email_type,
+          is_real: row.is_real,
+          is_read: row.is_read,
+        })
+        .eq("id", existingRow.id);
+      if (upErr) {
+        throw upErr;
+      }
+    } else {
+      const { error: insErr } = await supabase.from("job_emails").insert(row);
+      if (insErr) {
+        throw insErr;
+      }
+    }
   } else {
     const { error } = await supabase.from("job_emails").insert(row);
     if (error) throw error;
@@ -1293,7 +1413,6 @@ async function deleteOutreach(outreachId, options = {}) {
 
 async function getTokensByUser(userId) {
   if (!userId) {
-    console.warn("[getTokensByUser] userId required");
     return null;
   }
 
@@ -1309,7 +1428,7 @@ async function getTokensByUser(userId) {
     .maybeSingle();
 
   if (error && !error.message.includes("No rows")) {
-    console.error(`[getTokensByUser] ${userId}:`, error.message);
+    logger.error("getTokensByUser failed", { userId, error: error.message });
   }
 
   return data || null;
@@ -1321,13 +1440,16 @@ async function setTokensForUser(userId, tokens, verifiedEmailAddress) {
   }
 
   if (!supabase) {
-    // Local memory: store per-user
     memory.userTokens = memory.userTokens || {};
+    const prev = memory.userTokens[userId] || {};
+    const clearing = !tokens.access_token && !tokens.accessToken;
     memory.userTokens[userId] = {
+      ...prev,
       ...tokens,
-      verified_email_address: verifiedEmailAddress,
+      verified_email_address: verifiedEmailAddress ?? prev.verified_email_address,
       verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      last_checked: clearing ? null : prev.last_checked,
     };
     saveLocalMemory(memory);
     return memory.userTokens[userId];
@@ -1351,17 +1473,42 @@ async function setTokensForUser(userId, tokens, verifiedEmailAddress) {
     .single();
 
   if (error) {
-    console.error(`[setTokensForUser] ${userId}:`, error.message);
+    logger.error("setTokensForUser failed", { userId, error: error.message });
     throw error;
   }
 
   return data;
 }
 
+async function deleteTokensForUser(userId) {
+  if (!userId) {
+    throw new Error("deleteTokensForUser: userId required");
+  }
+
+  if (!supabase) {
+    memory.userTokens = memory.userTokens || {};
+    delete memory.userTokens[userId];
+    saveLocalMemory(memory);
+    return true;
+  }
+
+  const { error } = await supabase
+    .from("oauth_tokens")
+    .delete()
+    .eq("owner_user_id", userId);
+
+  if (error) {
+    logger.error("deleteTokensForUser failed", { userId, error: error.message });
+    throw error;
+  }
+
+  return true;
+}
+
 async function refreshTokenIfExpiredForUser(userId) {
   const storedTokens = await getTokensByUser(userId);
   if (!storedTokens) {
-    console.warn(`[refreshTokenIfExpiredForUser] ${userId} has no stored tokens`);
+    logger.warn("No stored tokens for user", { userId });
     return null;
   }
 
@@ -1373,37 +1520,40 @@ async function refreshTokenIfExpiredForUser(userId) {
   }
 
   if (!storedTokens.refresh_token) {
-    console.warn(`[refreshTokenIfExpiredForUser] ${userId} has no refresh_token`);
+    logger.warn("No refresh_token for user", { userId });
     return null;
   }
 
   try {
     // Note: This requires createGmailClient to be imported from gmail.js
     // For now, return null and let jobSync.js handle refresh separately
-    console.warn(`[refreshTokenIfExpiredForUser] ${userId} token expired, needs manual refresh`);
+    logger.warn("Token expired, needs manual refresh", { userId });
     return null;
   } catch (error) {
-    console.error(`[refreshTokenIfExpiredForUser] ${userId}:`, error.message);
+    logger.error("Token refresh failed", { userId, error: error.message });
     return null;
   }
 }
 
 async function getAllUsersWithActiveTokens() {
   if (!supabase) {
-    // Local memory: return keys of userTokens
-    return Object.keys(memory.userTokens || {});
+    return Object.keys(memory.userTokens || {}).filter((uid) => {
+      const t = memory.userTokens[uid];
+      return t && (t.access_token || t.accessToken);
+    });
   }
 
   const { data, error } = await supabase
     .from("oauth_tokens")
-    .select("owner_user_id");
+    .select("owner_user_id")
+    .not("access_token", "is", null);
 
   if (error) {
-    console.error("[getAllUsersWithActiveTokens]:", error.message);
+    logger.error("getAllUsersWithActiveTokens failed", { error: error.message });
     return [];
   }
 
-  return data?.map(row => row.owner_user_id) || [];
+  return data?.map((row) => row.owner_user_id) || [];
 }
 
 module.exports = {
@@ -1417,6 +1567,7 @@ module.exports = {
   // New per-user token functions (replaces above in new code path)
   getTokensByUser,
   setTokensForUser,
+  deleteTokensForUser,
   refreshTokenIfExpiredForUser,
   getAllUsersWithActiveTokens,
   getJobs,

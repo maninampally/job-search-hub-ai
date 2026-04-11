@@ -7,6 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const { env } = require("../config/env");
+const { logger } = require("../utils/logger");
 
 const AUDIT_LOG_DIR = path.join(__dirname, "../../data/audit-logs");
 const ENABLED = env.AUDIT_LOG_ENABLED !== "false";
@@ -137,7 +138,7 @@ function cleanupOldLogs() {
       const stats = fs.statSync(filePath);
       if (now - stats.mtimeMs > retentionMs) {
         fs.unlinkSync(filePath);
-        console.log(`[AuditLogger] Deleted old log: ${file}`);
+        logger.info("[AuditLogger] deleted old log file", { file });
       }
     });
   } catch (error) {

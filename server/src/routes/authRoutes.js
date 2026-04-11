@@ -15,16 +15,10 @@ const {
   auditOAuthDisconnect,
   auditFailedLogin,
 } = require("../services/auditService");
-const {
-  clearTokens,
-  getLastChecked,
-  getTokens,
-  setTokens,
-  getTokensByUser,
-  setTokensForUser,
-} = require("../store/dataStore");
-const { requireUserAuth } = require("../middleware/requireUserAuth");
-const { requireTier } = require("../middleware/requireTier");
+const { getTokensByUser, setTokensForUser, setLastChecked, deleteTokensForUser } = require("../store/dataStore");
+const { fetchJobEmails } = require("../services/jobSync");
+const { requireUserAuth, requireUserAuthFlexible } = require("../middleware/requireUserAuth");
+const { requireTierGmailSync } = require("../middleware/requireTier");
 const {
   findUserByEmail,
   findUserById,
@@ -43,17 +37,29 @@ const {
   deleteAllUserSessions,
   deleteOtherSessions,
   listUserSessions,
+  getMFAConfig,
+  saveMFAConfig,
+  disableMFA,
 } = require("../store/userStore");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const {
   createAuthToken,
+  verifyAuthToken,
   generateRefreshToken,
   setRefreshCookie,
   clearRefreshCookie,
   REFRESH_COOKIE_NAME,
 } = require("../utils/sessionToken");
+const { google } = require("googleapis");
 const { env } = require("../config/env");
 const { oauth2Client, GMAIL_SCOPES, createGmailClient } = require("../integrations/gmail");
+
+/** OpenID + profile only (login / register). Gmail sync uses separate OAuth with GMAIL_SCOPES. */
+const GOOGLE_SIGNIN_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+];
 
 // Optional: Import nodemailer for email verification (requires package.json to have nodemailer)
 let nodemailer = null;
@@ -71,11 +77,18 @@ const {
   verifyBackupCode,
   consumeBackupCode,
 } = require('../services/mfaService');
-const { getMFAConfig, saveMFAConfig, disableMFA } = require('../store/userStore');
-
 const authRoutes = express.Router();
 
 // Apply rate limit to auth endpoints
+
+const TIER_ORDER_FOR_GMAIL = ["free", "pro", "elite", "admin"];
+
+function gmailSyncAllowedForRole(role) {
+  const r = role || "free";
+  const idx = TIER_ORDER_FOR_GMAIL.indexOf(r);
+  const proIdx = TIER_ORDER_FOR_GMAIL.indexOf("pro");
+  return env.ALLOW_FREE_TIER_GMAIL_SYNC || (idx >= 0 && idx >= proIdx);
+}
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim().toLowerCase());
@@ -93,10 +106,17 @@ function toSafeUserResponse(user) {
     createdAt: safe.createdAt,
     updatedAt: safe.updatedAt,
     lastLoginAt: safe.lastLoginAt || null,
+    role: safe.role || "free",
+    plan_expires: safe.plan_expires ?? null,
     // NEW: Include verification status for frontend gating
     email_verified_at: safe.email_verified_at || null,
     is_email_verified: isEmailVerified(safe),
   };
+}
+
+async function toSafeUserResponseWithMfa(userId, user) {
+  const mfa = await getMFAConfig(userId);
+  return { ...toSafeUserResponse(user), totp_enabled: Boolean(mfa?.totp_enabled) };
 }
 
 // Helper: determine if running in production for cookie security flag
@@ -111,7 +131,7 @@ function buildJwtPayload(user) {
     role: user.role || "free",
     plan_expires: user.plan_expires || null,
     email_verified: isEmailVerified(user),
-    mfa_passed: false, // MFA challenge sets this separately
+    mfa_passed: user.mfa_passed || false,
     email: user.email,
     name: user.name,
   };
@@ -204,6 +224,11 @@ authRoutes.post("/login", rateLimitAuth({ maxAttempts: 5, windowMs: 15 * 60 * 10
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    if (user.is_suspended) {
+      await auditFailedLogin(email, ipAddress, "account_suspended");
+      return res.status(403).json({ error: "Account suspended. Contact support." });
+    }
+
     // Check if MFA is enabled
     const mfaConfig = await getMFAConfig(user.id);
     const mfaEnabled = mfaConfig?.totp_enabled || false;
@@ -261,8 +286,14 @@ authRoutes.post("/refresh", async (req, res) => {
   try {
     const session = await getSessionByHash(hash);
     if (!session) {
-      // Token not found or expired - could indicate theft, clear cookie
+      // Potential theft: token was already rotated but is being replayed.
+      // Attempt to identify the user from any session with this token's fingerprint
+      // and invalidate ALL their sessions as a precaution.
       clearRefreshCookie(res);
+      logger.warn("Refresh token not found - possible replay/theft detected", {
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
       return res.status(401).json({ error: "Session expired or invalid" });
     }
 
@@ -274,6 +305,13 @@ authRoutes.post("/refresh", async (req, res) => {
     if (!user) {
       clearRefreshCookie(res);
       return res.status(401).json({ error: "User not found" });
+    }
+
+    // Block suspended users
+    if (user.is_suspended) {
+      await deleteAllUserSessions(user.id);
+      clearRefreshCookie(res);
+      return res.status(403).json({ error: "Account suspended" });
     }
 
     // Issue new access token
@@ -391,7 +429,12 @@ authRoutes.post("/change-password", requireUserAuth, async (req, res) => {
 });
 
 authRoutes.get("/me", requireUserAuth, async (req, res) => {
-  return res.json({ user: req.authUser });
+  try {
+    const user = await toSafeUserResponseWithMfa(req.authUser.id, req.authUser);
+    return res.json({ user });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to load profile", details: error.message });
+  }
 });
 
 authRoutes.patch("/me", requireUserAuth, async (req, res) => {
@@ -407,7 +450,8 @@ authRoutes.patch("/me", requireUserAuth, async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: "User profile not found" });
     }
-    return res.json({ user: toSafeUserResponse(updated) });
+    const user = await toSafeUserResponseWithMfa(req.authUser.id, updated);
+    return res.json({ user });
   } catch (error) {
     return res.status(500).json({ error: "Unable to update profile", details: error.message });
   }
@@ -454,7 +498,7 @@ authRoutes.post("/verify-email/request", requireUserAuth, rateLimitEmailVerifica
     // Send verification email
     // In dev, FRONTEND_URL is often missing. Fall back to request origin or Vite default.
     const frontendUrl = env.FRONTEND_URL || req.headers.origin || "http://localhost:5173";
-    const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+    const verifyUrl = `${frontendUrl}/confirm-email?token=${verificationToken}`;
 
     let emailSent = false;
 
@@ -571,7 +615,7 @@ authRoutes.get("/verify-email/confirm", async (req, res) => {
     res.json({
       success: true,
       message: "Email verified successfully",
-      redirectUrl: `${env.FRONTEND_URL}/dashboard?verified=true`
+      redirectUrl: `${env.FRONTEND_URL}/login?verified=true`
     });
   } catch (error) {
     logger.error("Email verification confirm failed", { error: error.message });
@@ -588,44 +632,100 @@ function generateCodeChallenge(verifier) {
   return crypto.createHash("sha256").update(verifier).digest("base64url");
 }
 
-authRoutes.get("/gmail", requireUserAuth, requireTier('pro', 'gmail_sync'), async (req, res) => {
+/**
+ * Stores PKCE + CSRF state in session and returns the Google authorize URL.
+ * Used by GET /auth/gmail (browser navigation) and POST /auth/gmail/start (SPA + Bearer).
+ */
+function buildGmailOAuthAuthorizeUrl(req, userId) {
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+  const state = crypto.randomBytes(16).toString("hex");
+
+  req.session = req.session || {};
+  req.session.oauthMode = "gmail";
+  req.session.oauthState = state;
+  req.session.oauthUserId = userId;
+  req.session.oauthCodeVerifier = codeVerifier;
+
+  return oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: GMAIL_SCOPES,
+    // select_account: always show Google account picker when several accounts are in Chrome
+    // consent: needed so Google may return a refresh_token for offline Gmail access
+    prompt: "select_account consent",
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+  });
+}
+
+function buildGoogleSignInOAuthUrl(req) {
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+  const state = crypto.randomBytes(16).toString("hex");
+  req.session = req.session || {};
+  req.session.oauthMode = "google_signin";
+  req.session.oauthState = state;
+  req.session.oauthCodeVerifier = codeVerifier;
+  delete req.session.oauthUserId;
+  return oauth2Client.generateAuthUrl({
+    access_type: "online",
+    scope: GOOGLE_SIGNIN_SCOPES,
+    // Always show account chooser so users pick the right Google identity
+    prompt: "select_account",
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+  });
+}
+
+/**
+ * Public: start Google sign-in or sign-up (OpenID). Same REDIRECT_URI as Gmail connect (/auth/callback).
+ * User must add that exact URL under Authorized redirect URIs in Google Cloud Console.
+ */
+authRoutes.get("/google", rateLimitAuth({ maxAttempts: 30, windowMs: 15 * 60 * 1000 }), (req, res) => {
+  try {
+    const url = buildGoogleSignInOAuthUrl(req);
+    return res.redirect(url);
+  } catch (error) {
+    logger.error("Google sign-in start failed", { error: error.message });
+    return res.redirect(`${env.FRONTEND_URL}/login?error=google_signin_failed`);
+  }
+});
+
+authRoutes.get("/gmail", requireUserAuthFlexible, requireTierGmailSync, async (req, res) => {
   try {
     const user = await findUserById(req.authUser.id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    if (!isEmailVerified(user)) {
-      return res.status(403).json({
-        error: "Please verify your email first",
-        action: "verify_email_required"
-      });
-    }
+    // Email is not verified via a separate link. Gmail OAuth below proves inbox access:
+    // callback enforces Google account email === registered app email before storing tokens.
 
-    // PKCE: generate verifier + challenge
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    // CSRF state
-    const state = crypto.randomBytes(16).toString("hex");
-
-    req.session = req.session || {};
-    req.session.oauthState = state;
-    req.session.oauthUserId = req.authUser.id;
-    req.session.oauthCodeVerifier = codeVerifier;
-
-    const url = oauth2Client.generateAuthUrl({
-      access_type: "offline",
-      scope: GMAIL_SCOPES,
-      prompt: "consent",
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-    });
-    res.redirect(url);
+    const url = buildGmailOAuthAuthorizeUrl(req, req.authUser.id);
+    return res.redirect(url);
   } catch (error) {
     logger.error("OAuth start failed", { error: error.message });
     res.status(500).json({ error: "OAuth start failed" });
+  }
+});
+
+/**
+ * Start Gmail OAuth from the SPA using the in-memory access token (Authorization: Bearer).
+ * Returns { redirectUrl } so the client can navigate to Google without relying on refresh cookies on a top-level hop.
+ */
+authRoutes.post("/gmail/start", requireUserAuth, requireTierGmailSync, async (req, res) => {
+  try {
+    const user = await findUserById(req.authUser.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const redirectUrl = buildGmailOAuthAuthorizeUrl(req, req.authUser.id);
+    return res.json({ redirectUrl });
+  } catch (error) {
+    logger.error("OAuth start failed", { error: error.message });
+    return res.status(500).json({ error: "OAuth start failed" });
   }
 });
 
@@ -633,28 +733,98 @@ authRoutes.get("/callback", async (req, res) => {
   const { code, state } = req.query;
   const ipAddress = req.ip || req.connection.remoteAddress;
 
+  const clearOAuthSession = () => {
+    if (!req.session) return;
+    delete req.session.oauthState;
+    delete req.session.oauthMode;
+    delete req.session.oauthUserId;
+    delete req.session.oauthCodeVerifier;
+  };
+
   try {
-    // Validate CSRF state
     if (!req.session?.oauthState || req.session.oauthState !== state) {
       return res.status(400).json({ error: "Invalid OAuth state" });
     }
 
-    const userId = req.session.oauthUserId;
     const codeVerifier = req.session.oauthCodeVerifier;
+    const mode = req.session.oauthMode || "gmail";
+    const userId = req.session.oauthUserId;
+
+    if (!code || !codeVerifier) {
+      clearOAuthSession();
+      return res.status(400).json({ error: "Invalid OAuth response" });
+    }
+
+    const { tokens } = await oauth2Client.getToken({ code, codeVerifier });
+
+    if (mode === "google_signin") {
+      oauth2Client.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+      let profile;
+      try {
+        const userInfo = await oauth2.userinfo.get();
+        profile = userInfo.data;
+      } catch (infoErr) {
+        logger.error("Google userinfo failed", { error: infoErr.message });
+        clearOAuthSession();
+        return res.redirect(`${env.FRONTEND_URL}/login?error=google_signin_failed`);
+      }
+
+      const emailNorm = String(profile.email || "").trim().toLowerCase();
+      if (!isValidEmail(emailNorm) || !profile.verified_email) {
+        clearOAuthSession();
+        return res.redirect(`${env.FRONTEND_URL}/login?error=google_signin_failed`);
+      }
+
+      let user = await findUserByEmail(emailNorm);
+      let isNewUser = false;
+      if (!user) {
+        const randomPass = crypto.randomBytes(32).toString("hex");
+        const displayName = String(profile.name || emailNorm.split("@")[0] || "User").trim() || "User";
+        user = await createUser({
+          email: emailNorm,
+          passwordHash: hashPassword(randomPass),
+          name: displayName,
+        });
+        isNewUser = true;
+      } else {
+        const mfaConfig = await getMFAConfig(user.id);
+        if (mfaConfig?.totp_enabled) {
+          await auditFailedLogin(emailNorm, ipAddress, "google_oauth_blocked_mfa");
+          clearOAuthSession();
+          return res.redirect(`${env.FRONTEND_URL}/login?error=google_requires_password`);
+        }
+        if (user.is_suspended) {
+          await auditFailedLogin(emailNorm, ipAddress, "account_suspended");
+          clearOAuthSession();
+          return res.redirect(`${env.FRONTEND_URL}/login?error=google_signin_failed`);
+        }
+      }
+
+      await touchLastLogin(user.id);
+      await issueRefreshToken(res, user.id, req);
+      if (isNewUser) {
+        await auditRegister(user.id, emailNorm, ipAddress);
+      } else {
+        await auditLogin(user.id, emailNorm, ipAddress, false);
+      }
+
+      clearOAuthSession();
+      return res.redirect(`${env.FRONTEND_URL}/dashboard?signed_in=google`);
+    }
 
     if (!userId) {
+      clearOAuthSession();
       return res.status(400).json({ error: "OAuth session invalid" });
     }
 
     const user = await findUserById(userId);
     if (!user) {
+      clearOAuthSession();
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Exchange code using PKCE verifier
-    const { tokens } = await oauth2Client.getToken({ code, codeVerifier });
-
-    // Verify Gmail account email matches app account email
+    // Gmail connect: verify inbox matches app account
     const gmail = createGmailClient(tokens);
     let gmailProfile;
     try {
@@ -698,15 +868,26 @@ authRoutes.get("/callback", async (req, res) => {
     // Audit logging
     await auditOAuthConnect(userId, "google", gmailEmail, ipAddress);
 
-    // Clear PKCE + state from session
-    delete req.session.oauthState;
-    delete req.session.oauthUserId;
-    delete req.session.oauthCodeVerifier;
+    await updateUserVerification(userId, {
+      verifiedAt: new Date().toISOString(),
+      tokenHash: null,
+    }).catch(() => {});
 
-    const redirectUrl = `${env.FRONTEND_URL}/dashboard?gmail_connected=true&email=${encodeURIComponent(gmailEmail)}`;
+    clearOAuthSession();
+
+    fetchJobEmails({ mode: "initial", userId }).catch((err) =>
+      logger.error("Initial Gmail sync after connect failed", { userId, error: err.message })
+    );
+
+    const redirectUrl = `${env.FRONTEND_URL}/dashboard?gmail_connected=true&connected=true&email=${encodeURIComponent(gmailEmail)}`;
     res.redirect(redirectUrl);
   } catch (error) {
     logger.error("OAuth callback failed", { error: error.message });
+    try {
+      clearOAuthSession();
+    } catch {
+      /* ignore */
+    }
     res.status(500).json({ error: "OAuth callback failed" });
   }
 });
@@ -717,7 +898,8 @@ authRoutes.get("/status", requireUserAuth, async (req, res) => {
     const tokens = await getTokensByUser(userId);
     const lastChecked = tokens?.last_checked || null;
     const isConnected = Boolean(tokens?.access_token);
-    res.json({ connected: isConnected, lastChecked });
+    const gmailSyncAllowed = gmailSyncAllowedForRole(req.user?.role);
+    res.json({ connected: isConnected, lastChecked, gmailSyncAllowed });
   } catch (error) {
     res.status(500).json({ error: "Unable to read auth status", details: error.message });
   }
@@ -726,16 +908,9 @@ authRoutes.get("/status", requireUserAuth, async (req, res) => {
 authRoutes.post("/disconnect", requireUserAuth, async (req, res) => {
   try {
     const userId = req.authUser.id;
-    // Delete the user's oauth tokens row
-    // For now, just clear the tokens by setting them to null
-    // In the future, we could delete the row entirely
-    await setTokensForUser(userId, {
-      access_token: null,
-      refresh_token: null,
-      scope: null,
-      token_type: null,
-      expiry_date: null,
-    }, null);
+    // Remove per-user OAuth tokens row completely to avoid NOT NULL conflicts
+    await deleteTokensForUser(userId);
+    await setLastChecked(userId, null);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Unable to disconnect", details: error.message });
@@ -869,7 +1044,7 @@ authRoutes.post("/mfa/setup", requireUserAuth, async (req, res) => {
       message: "Scan QR code with authenticator app. Keep backup codes safe."
     });
   } catch (error) {
-    console.error("[auth/mfa/setup]:", error);
+    logger.error("MFA setup failed", { error: error.message });
     res.status(500).json({ error: "Failed to setup MFA" });
   }
 });
@@ -919,7 +1094,7 @@ authRoutes.post("/mfa/verify", requireUserAuth, async (req, res) => {
       message: "MFA enabled successfully"
     });
   } catch (error) {
-    console.error("[auth/mfa/verify]:", error);
+    logger.error("MFA verify failed", { error: error.message });
     res.status(500).json({ error: "Failed to verify MFA" });
   }
 });
@@ -957,7 +1132,7 @@ authRoutes.post("/mfa/disable", requireUserAuth, async (req, res) => {
       message: "MFA disabled successfully"
     });
   } catch (error) {
-    console.error("[auth/mfa/disable]:", error);
+    logger.error("MFA disable failed", { error: error.message });
     res.status(500).json({ error: "Failed to disable MFA" });
   }
 });
@@ -1019,11 +1194,11 @@ authRoutes.post("/mfa/challenge", async (req, res) => {
       return res.status(401).json({ error: "Invalid authenticator or backup code" });
     }
 
-    // MFA verified - issue full access token
+    // MFA verified - mfa_passed flows through buildJwtPayload
     const token = createAuthToken(
       buildJwtPayload({ ...user, mfa_passed: true }),
       env.AUTH_TOKEN_SECRET,
-      0.25 // 15-min access token
+      0.25
     );
 
     await touchLastLogin(userId);
@@ -1031,7 +1206,7 @@ authRoutes.post("/mfa/challenge", async (req, res) => {
 
     return res.json({ success: true, token, user: toSafeUserResponse(user) });
   } catch (error) {
-    console.error("[auth/mfa/challenge]:", error);
+    logger.error("MFA challenge failed", { error: error.message });
     res.status(500).json({ error: "Failed to verify MFA" });
   }
 });

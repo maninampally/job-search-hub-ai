@@ -4,6 +4,7 @@ const { generateCoverLetter } = require("../services/coverLetterService");
 const { getInterviewCoaching: answerInterviewQuestion } = require("../services/interviewCoachService");
 const { getFollowUpNudges } = require("../services/followUpService");
 const { checkAndIncrementQuota } = require("../store/aiUsageStore");
+const { logger } = require("../utils/logger");
 
 const aiRoutes = express.Router();
 
@@ -28,8 +29,8 @@ aiRoutes.post("/cover-letter", requireTier("elite", "ai_cover_letter"), async (r
     });
     return res.json({ success: true, ...result, quotaUsed: quota.used, quotaLimit: quota.limit });
   } catch (err) {
-    console.error("[ai/cover-letter]", err.message);
-    return res.status(500).json({ error: "Failed to generate cover letter", details: err.message });
+    logger.error("[ai/cover-letter] failed", { error: err.message });
+    return res.status(500).json({ error: "Failed to generate cover letter" });
   }
 });
 
@@ -51,8 +52,8 @@ aiRoutes.post("/interview-coach", requireTier("elite", "ai_interview_coach"), as
     const result = await answerInterviewQuestion(question, jobContext || {});
     return res.json({ success: true, ...result, quotaUsed: quota.used, quotaLimit: quota.limit });
   } catch (err) {
-    console.error("[ai/interview-coach]", err.message);
-    return res.status(500).json({ error: "Failed to generate answer", details: err.message });
+    logger.error("[ai/interview-coach] failed", { error: err.message });
+    return res.status(500).json({ error: "Failed to generate answer" });
   }
 });
 
@@ -63,8 +64,8 @@ aiRoutes.get("/nudges", requireTier("pro", "smart_nudges"), async (req, res) => 
     const nudges = await getFollowUpNudges(userId);
     return res.json({ success: true, nudges });
   } catch (err) {
-    console.error("[ai/nudges]", err.message);
-    return res.status(500).json({ error: "Failed to get nudges", details: err.message });
+    logger.error("[ai/nudges] failed", { error: err.message });
+    return res.status(500).json({ error: "Failed to get nudges" });
   }
 });
 
@@ -76,7 +77,8 @@ aiRoutes.get("/usage", requireTier("pro", "ai_usage"), async (req, res) => {
     const usage = await getTodayUsage(userId);
     return res.json({ success: true, usage });
   } catch (err) {
-    return res.status(500).json({ error: "Failed to get usage", details: err.message });
+    logger.error("[ai/usage] failed", { error: err.message });
+    return res.status(500).json({ error: "Failed to get usage" });
   }
 });
 

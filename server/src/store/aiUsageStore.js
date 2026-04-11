@@ -1,4 +1,5 @@
 const { query: dbQuery } = require("../services/dbAdapter");
+const { logger } = require("../utils/logger");
 
 /**
  * Check quota and increment usage counter.
@@ -31,7 +32,7 @@ async function checkAndIncrementQuota(userId, feature, limit) {
     return { allowed: true, used: used + 1, limit };
   } catch (err) {
     // Table may not exist yet - allow the call but warn
-    console.warn("[aiUsageStore] quota check failed (table missing?), allowing:", err.message);
+    logger.warn("AI quota check failed, allowing request", { error: err.message });
     return { allowed: true, used: 0, limit };
   }
 }
@@ -53,7 +54,7 @@ async function getTodayUsage(userId) {
       return acc;
     }, {});
   } catch (err) {
-    console.warn("[aiUsageStore] getTodayUsage failed:", err.message);
+    logger.warn("getTodayUsage failed", { error: err.message });
     return {};
   }
 }

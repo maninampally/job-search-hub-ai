@@ -8,7 +8,6 @@ const {
   getJobStatusTimeline,
   getJobs,
   getLastChecked,
-  getTokens,
   getTokensByUser,
   markJobImported,
   updateJob,
@@ -20,7 +19,9 @@ const { VALID_STATUSES, EMAIL_TYPES } = require("../config/constants");
 const { rateLimitMiddleware } = require("../security/rateLimiter");
 const { logSync, logError } = require("../security/auditLogger");
 const { requireUserAuth } = require("../middleware/requireUserAuth");
-const { requireTier } = require("../middleware/requireTier");
+const { requireTierGmailSync } = require("../middleware/requireTier");
+const { logger } = require("../utils/logger");
+const { parseJobsSyncBody } = require("../schemas/jobSyncSchemas");
 
 const jobRoutes = express.Router();
 
@@ -88,7 +89,7 @@ jobRoutes.get("/", requireUserAuth, async (req, res) => {
   try {
     const userId = getAuthenticatedUserId(req);
     const jobs = await getJobs({ userId });
-    const lastChecked = await getLastChecked();
+    const lastChecked = await getLastChecked(userId);
     res.json({ jobs, lastChecked });
   } catch (error) {
     res.status(500).json({ error: "Unable to load jobs", details: error.message });
@@ -101,8 +102,20 @@ jobRoutes.get("/sync-status", requireUserAuth, (req, res) => {
   res.json(getSyncStatus(userId));
 });
 
-jobRoutes.post("/sync", requireUserAuth, requireTier('pro', 'gmail_sync'), rateLimitMiddleware, async (req, res) => {
+jobRoutes.post("/sync", requireUserAuth, requireTierGmailSync, rateLimitMiddleware, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
+  const parsed = parseJobsSyncBody(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "Invalid sync request",
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const { forceReprocess = false, fullWindow = false, lookbackDays, processAll = true } = parsed.data;
+  /** Wide Gmail window: fullWindow or explicit lookbackDays. */
+  const wideSync = Boolean(fullWindow) || lookbackDays != null;
+  const mode = wideSync ? "initial" : "daily";
   if (!userId) {
     return res.status(401).json({ error: "Not authenticated" });
   }
@@ -119,13 +132,21 @@ jobRoutes.post("/sync", requireUserAuth, requireTier('pro', 'gmail_sync'), rateL
   }
 
   try {
-    logSync("SYNC_TRIGGERED", userId, { mode: "daily" });
+    logSync("SYNC_TRIGGERED", userId, { mode, forceReprocess, fullWindow, lookbackDays, processAll });
     // Run in background — respond immediately so UI isn't blocked
-    fetchJobEmails({ mode: "daily", userId }).catch((err) =>
-      console.error("[sync] background error:", err.message)
+    fetchJobEmails({ mode, userId, forceReprocess, lookbackDays, processAll }).catch((err) =>
+      logger.error("Manual sync background error", { userId, error: err.message })
     );
 
-    return res.json({ started: true, isSyncing: true });
+    return res.json({
+      started: true,
+      isSyncing: true,
+      forceReprocess,
+      fullWindow,
+      lookbackDays: lookbackDays ?? null,
+      processAll,
+      mode,
+    });
   } catch (error) {
     logError("SYNC_ERROR", error, userId);
     return res.status(500).json({ error: "Sync failed", details: error.message });
@@ -146,7 +167,7 @@ jobRoutes.post("/backfill-emails", async (req, res) => {
   try {
     const result = await backfillJobEmailsFromExistingJobs({ userId });
     const jobs = await getJobs({ userId });
-    const lastChecked = await getLastChecked();
+    const lastChecked = await getLastChecked(userId);
     return res.json({ ...result, jobs, lastChecked });
   } catch (error) {
     return res.status(500).json({ error: "Backfill failed", details: error.message });
@@ -296,10 +317,11 @@ jobRoutes.get("/analytics/daily", async (req, res) => {
       dailyCounts[dateKey] = 0;
     }
 
-    // Count applications by appliedDate
+    // Count applications by appliedDate - only jobs with "Applied" status
     for (const job of jobs) {
       const appliedDate = job.appliedDate;
-      if (appliedDate) {
+      // Only count jobs with "Applied" status
+      if (appliedDate && job.status === "Applied") {
         const dateObj = toDateSafe(appliedDate);
         if (dateObj) {
           const dateKey = dateObj.toISOString().split("T")[0]; // Extract YYYY-MM-DD
@@ -333,6 +355,92 @@ jobRoutes.get("/analytics/daily", async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: "Unable to build daily analytics", details: error.message });
+  }
+});
+
+/**
+ * GET /jobs/daily-report
+ * Summary of sync activity in the last 24h (default 9PM-9PM window).
+ * Query params: ?hours=24 (override window size)
+ */
+jobRoutes.get("/daily-report", async (req, res) => {
+  try {
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+    const hours = Math.min(Math.max(parseInt(req.query.hours) || 24, 1), 168);
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+    const jobs = await getJobs({ userId });
+    const allEmails = [];
+    for (const job of jobs) {
+      const emails = await getJobEmails(job.id, { userId });
+      for (const em of emails) {
+        allEmails.push({ ...em, jobId: job.id, company: job.company, role: job.role });
+      }
+    }
+
+    const recentEmails = allEmails.filter((em) => {
+      const d = new Date(em.date);
+      return !Number.isNaN(d.getTime()) && d >= windowStart && d <= now;
+    });
+
+    const jobsCreatedInWindow = jobs.filter((j) => {
+      const d = new Date(j.createdAt);
+      return !Number.isNaN(d.getTime()) && d >= windowStart && d <= now;
+    });
+
+    const statusChanges = [];
+    for (const job of jobs) {
+      const timeline = await getJobStatusTimeline(job.id, { userId });
+      for (const ev of timeline) {
+        const d = new Date(ev.changedAt);
+        if (!Number.isNaN(d.getTime()) && d >= windowStart && d <= now) {
+          statusChanges.push({
+            company: job.company,
+            role: job.role,
+            from: ev.fromStatus,
+            to: ev.toStatus,
+            trigger: ev.trigger,
+            date: ev.changedAt,
+          });
+        }
+      }
+    }
+
+    const emailsByType = {};
+    for (const em of recentEmails) {
+      const t = em.type || "Unknown";
+      emailsByType[t] = (emailsByType[t] || 0) + 1;
+    }
+
+    return res.json({
+      window: { start: windowStart.toISOString(), end: now.toISOString(), hours },
+      summary: {
+        emailsProcessed: recentEmails.length,
+        jobsCreated: jobsCreatedInWindow.length,
+        statusChanges: statusChanges.length,
+      },
+      emailsByType,
+      newJobs: jobsCreatedInWindow.map((j) => ({
+        company: j.company,
+        role: j.role,
+        status: j.status,
+        appliedDate: j.appliedDate,
+      })),
+      statusChanges,
+      recentEmails: recentEmails.slice(0, 50).map((em) => ({
+        company: em.company,
+        role: em.role,
+        subject: em.subject,
+        from: em.fromName || em.from,
+        date: em.date,
+        type: em.type,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Unable to build daily report", details: error.message });
   }
 });
 
@@ -421,8 +529,40 @@ jobRoutes.get("/timeline/:id", async (req, res) => {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    const timeline = await getJobStatusTimeline(req.params.id, { userId });
-    return res.json({ timeline });
+    const statusEvents = await getJobStatusTimeline(req.params.id, { userId });
+    const emails = await getJobEmails(req.params.id, { userId });
+
+    const unified = [];
+
+    for (const ev of statusEvents) {
+      unified.push({
+        type: "status_change",
+        date: ev.changedAt || ev.changed_at,
+        title: ev.fromStatus
+          ? `${ev.fromStatus} \u2192 ${ev.toStatus}`
+          : `Status set to ${ev.toStatus}`,
+        detail: ev.trigger === "email_sync" ? "Updated from email" : "Manual change",
+        from_status: ev.fromStatus,
+        to_status: ev.toStatus,
+        trigger: ev.trigger,
+      });
+    }
+
+    for (const em of emails) {
+      unified.push({
+        type: "email",
+        date: em.date,
+        title: em.subject || "No subject",
+        detail: em.preview || "",
+        from: em.fromName || em.from || "Unknown",
+        emailType: em.type || em.emailType || "Auto / Tracking",
+        isReal: em.isReal,
+      });
+    }
+
+    unified.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return res.json({ timeline: unified });
   } catch (error) {
     return res.status(500).json({ error: "Unable to load timeline", details: error.message });
   }
