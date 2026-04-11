@@ -1,3 +1,4 @@
+import { useState } from "react";
 import JobListView from "../JobListView";
 import EmailLogTab from "../EmailLogTab";
 import TimelineTab from "../TimelineTab";
@@ -34,7 +35,7 @@ export default function JobTrackerView({
   onSaveJob,
   onJobInput,
   onCancelEditJob,
-  onSync,
+  onRunSyncPreset,
   onLoadDashboard,
   onAttachResume,
   onEmailCardDoubleClick,
@@ -48,6 +49,8 @@ export default function JobTrackerView({
   formatEmailDate,
   getEmailIdentity,
 }) {
+  const [syncPreset, setSyncPreset] = useState("now");
+
   function renderJobTrackerCard(job) {
     const emails = mergeEmails([], job.emails || []);
     const isExpanded = Boolean(expandedJobs[job.id]);
@@ -281,8 +284,27 @@ export default function JobTrackerView({
           <button type="button" onClick={onLoadDashboard} disabled={loading}>
             Refresh
           </button>
-          <button type="button" onClick={onSync} disabled={!connected || syncing}>
-            {syncing ? "Syncing..." : "Sync Jobs"}
+          <select
+            value={syncPreset}
+            onChange={(event) => setSyncPreset(event.target.value)}
+            disabled={!connected || syncing}
+            title="Choose sync window"
+          >
+            <option value="now">Sync now (since last auto sync)</option>
+            <option value="6m">Sync 6M</option>
+            <option value="3m">Sync 3M</option>
+            <option value="1m">Sync 1M</option>
+            <option value="1w">Sync 1W</option>
+            <option value="3d">Sync 3D</option>
+            <option value="1d">Sync 1D</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => typeof onRunSyncPreset === "function" && onRunSyncPreset(syncPreset)}
+            disabled={!connected || syncing || typeof onRunSyncPreset !== "function"}
+            title="Run selected sync window"
+          >
+            {syncing ? "Syncing..." : "Run sync"}
           </button>
         </div>
       </header>

@@ -23,6 +23,8 @@ function getEmailTypeClass(type) {
   return EMAIL_TYPE_CLASS[type] || "email-type-auto";
 }
 
+const JOB_STATUS_OPTIONS = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Rejected"];
+
 export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob }) {
   const [expandedId, setExpandedId] = useState(null);
   const [activeJobTab, setActiveJobTab] = useState({});
@@ -64,7 +66,12 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
   });
 
   const handleExpandToggle = (jobId) => {
-    setExpandedId(expandedId === jobId ? null : jobId);
+    if (expandedId === jobId) {
+      setExpandedId(null);
+      setEditingJobId((eid) => (eid === jobId ? null : eid));
+    } else {
+      setExpandedId(jobId);
+    }
   };
 
   const handleUploadClick = async (jobId, event) => {
@@ -155,14 +162,15 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
   };
 
   const handleEdit = (job, event) => {
-    event.stopPropagation();
+    if (event?.stopPropagation) event.stopPropagation();
     setActiveMenuJobId(null);
     setExpandedId(job.id);
     setEditingJobId(job.id);
+    setActiveJobTab((prev) => ({ ...prev, [job.id]: 'Summary' }));
     setInlineEditForm({
       company: job.company || '',
       role: job.role || '',
-      status: job.status || 'Applied',
+      status: job.status || 'Wishlist',
       appliedDate: (job.appliedDate || job.applied || '').toString().slice(0, 10),
       location: job.location || '',
       notes: job.notes || '',
@@ -177,8 +185,7 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
     setEditingJobId(null);
   };
 
-  const saveInlineEdit = async (jobId, event) => {
-    event.preventDefault();
+  const saveInlineEdit = async (jobId) => {
     setError('');
     if (!inlineEditForm.company.trim() || !inlineEditForm.role.trim()) {
       setError('Company and role are required.');
@@ -325,36 +332,112 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
                           {(activeJobTab[job.id] || 'Summary') === 'Summary' && (
                             <>
                               <div className="details-grid">
-                                <div className="detail-item">
-                                  <label>Location:</label>
-                                  <p>{job.location || 'Not specified'}</p>
-                                </div>
-                                <div className="detail-item">
-                                  <label>Source:</label>
-                                  <p>{job.source || 'Unknown'}</p>
-                                </div>
-                                <div className="detail-item">
-                                  <label>Status:</label>
-                                  <p>{job.status}</p>
-                                </div>
-                                <div className="detail-item">
-                                  <label>Applied Date:</label>
-                                  <p>{job.appliedDate || job.applied ? new Date(job.appliedDate || job.applied).toLocaleDateString() : 'N/A'}</p>
-                                </div>
+                                {editingJobId === job.id ? (
+                                  <>
+                                    <div className="detail-item">
+                                      <label htmlFor={`co-${job.id}`}>Company</label>
+                                      <input
+                                        id={`co-${job.id}`}
+                                        value={inlineEditForm.company}
+                                        onChange={(e) => handleInlineInput('company', e.target.value)}
+                                        placeholder="Company *"
+                                      />
+                                    </div>
+                                    <div className="detail-item">
+                                      <label htmlFor={`role-${job.id}`}>Role</label>
+                                      <input
+                                        id={`role-${job.id}`}
+                                        value={inlineEditForm.role}
+                                        onChange={(e) => handleInlineInput('role', e.target.value)}
+                                        placeholder="Role *"
+                                      />
+                                    </div>
+                                    <div className="detail-item">
+                                      <label htmlFor={`st-${job.id}`}>Status</label>
+                                      <select
+                                        id={`st-${job.id}`}
+                                        value={inlineEditForm.status}
+                                        onChange={(e) => handleInlineInput('status', e.target.value)}
+                                      >
+                                        {JOB_STATUS_OPTIONS.map((s) => (
+                                          <option key={s} value={s}>{s}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label htmlFor={`dt-${job.id}`}>Applied date</label>
+                                      <input
+                                        id={`dt-${job.id}`}
+                                        type="date"
+                                        value={inlineEditForm.appliedDate}
+                                        onChange={(e) => handleInlineInput('appliedDate', e.target.value)}
+                                      />
+                                    </div>
+                                    <div className="detail-item">
+                                      <label htmlFor={`loc-${job.id}`}>Location</label>
+                                      <input
+                                        id={`loc-${job.id}`}
+                                        value={inlineEditForm.location}
+                                        onChange={(e) => handleInlineInput('location', e.target.value)}
+                                        placeholder="Location"
+                                      />
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Source</label>
+                                      <p>{job.source || 'Unknown'}</p>
+                                    </div>
+                                    <div className="detail-item full-width">
+                                      <label htmlFor={`notes-${job.id}`}>Notes</label>
+                                      <textarea
+                                        id={`notes-${job.id}`}
+                                        value={inlineEditForm.notes}
+                                        onChange={(e) => handleInlineInput('notes', e.target.value)}
+                                        placeholder="Notes"
+                                        rows={3}
+                                      />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="detail-item">
+                                      <label>Company</label>
+                                      <p>{job.company || 'Unknown'}</p>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Role</label>
+                                      <p>{job.role || 'Unknown Role'}</p>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Location</label>
+                                      <p>{job.location || 'Not specified'}</p>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Source</label>
+                                      <p>{job.source || 'Unknown'}</p>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Status</label>
+                                      <p>{job.status}</p>
+                                    </div>
+                                    <div className="detail-item">
+                                      <label>Applied date</label>
+                                      <p>{job.appliedDate || job.applied ? new Date(job.appliedDate || job.applied).toLocaleDateString() : 'N/A'}</p>
+                                    </div>
+                                    {job.notes ? (
+                                      <div className="detail-item full-width">
+                                        <label>Notes</label>
+                                        <p>{job.notes}</p>
+                                      </div>
+                                    ) : null}
+                                  </>
+                                )}
                               </div>
 
-                              {job.notes && (
-                                <div className="detail-item full-width">
-                                  <label>Notes:</label>
-                                  <p>{job.notes}</p>
-                                </div>
-                              )}
-
                               {attachedResume && (
-                                <div className="detail-item full-width">
-                                  <label>Attached Resume:</label>
+                                <div className="detail-item full-width resume-detail-block">
+                                  <label>Attached resume</label>
                                   <div className="resume-info">
-                                    <span>Resume: {attachedResume.name}</span>
+                                    <span>{attachedResume.name}</span>
                                     <small>({attachedResume.fileSize} bytes)</small>
                                     <button type="button" className="btn btn-small" onClick={(e) => openResumePreview(attachedResume, e)}>
                                       Preview
@@ -364,19 +447,35 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
                               )}
 
                               <div className="detail-actions">
-                                <button className="btn btn-small btn-primary" onClick={(e) => handleUploadClick(job.id, e)}>
-                                  {attachedResume ? 'Change Resume' : 'Upload Resume'}
-                                </button>
-                                {attachedResume && (
-                                  <a
-                                    href={getResumeDownloadUrl(attachedResume.id)}
-                                    className="btn btn-small"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    Download Resume
-                                  </a>
+                                {editingJobId === job.id ? (
+                                  <>
+                                    <button type="button" className="btn btn-small btn-primary" onClick={() => saveInlineEdit(job.id)}>
+                                      Save
+                                    </button>
+                                    <button type="button" className="btn btn-small" onClick={cancelInlineEdit}>
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button type="button" className="btn btn-small btn-outline" onClick={(e) => handleEdit(job, e)}>
+                                      Edit details
+                                    </button>
+                                    <button className="btn btn-small btn-primary" onClick={(e) => handleUploadClick(job.id, e)}>
+                                      {attachedResume ? 'Change resume' : 'Upload resume'}
+                                    </button>
+                                    {attachedResume && (
+                                      <a
+                                        href={getResumeDownloadUrl(attachedResume.id)}
+                                        className="btn btn-small"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        Download resume
+                                      </a>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </>
@@ -398,34 +497,6 @@ export default function JobListView({ jobs, resumes, onJobUpdate, onDeleteJob })
                     </tr>
                   )}
 
-                  {editingJobId === job.id && (
-                    <tr className="job-inline-edit-row">
-                      <td colSpan="8">
-                        <div className="job-inline-edit-panel">
-                          <label>Edit Job Inline</label>
-                          <form className="inline-edit-form" onSubmit={(e) => saveInlineEdit(job.id, e)}>
-                            <input value={inlineEditForm.company} onChange={(e) => handleInlineInput('company', e.target.value)} placeholder="Company *" />
-                            <input value={inlineEditForm.role} onChange={(e) => handleInlineInput('role', e.target.value)} placeholder="Role *" />
-                            <select value={inlineEditForm.status} onChange={(e) => handleInlineInput('status', e.target.value)}>
-                              <option value="Wishlist">Wishlist</option>
-                              <option value="Applied">Applied</option>
-                              <option value="Screening">Screening</option>
-                              <option value="Interview">Interview</option>
-                              <option value="Offer">Offer</option>
-                              <option value="Rejected">Rejected</option>
-                            </select>
-                            <input type="date" value={inlineEditForm.appliedDate} onChange={(e) => handleInlineInput('appliedDate', e.target.value)} />
-                            <input value={inlineEditForm.location} onChange={(e) => handleInlineInput('location', e.target.value)} placeholder="Location" />
-                            <input value={inlineEditForm.notes} onChange={(e) => handleInlineInput('notes', e.target.value)} placeholder="Notes" />
-                            <div className="inline-edit-actions">
-                              <button type="submit" className="btn btn-small btn-primary">Save</button>
-                              <button type="button" className="btn btn-small" onClick={cancelInlineEdit}>Cancel</button>
-                            </div>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </React.Fragment>
               );
             })}

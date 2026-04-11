@@ -10,6 +10,7 @@ const ROUTE_TO_VIEW_MAP = {
   interviewprep: "Interview Prep",
   outreach: "Outreach",
   reminders: "Reminders",
+  settings: "Settings",
 };
 
 export default function DashboardWrapper() {

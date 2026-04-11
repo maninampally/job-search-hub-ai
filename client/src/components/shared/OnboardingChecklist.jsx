@@ -4,12 +4,6 @@ import styles from './OnboardingChecklist.module.css';
 
 const ONBOARDING_STEPS = [
   {
-    id: 'email-verified',
-    title: 'Verify Your Email',
-    description: 'Confirm your email address to activate your account',
-    icon: '✉️',
-  },
-  {
     id: 'mfa-enabled',
     title: 'Enable Two-Factor Auth',
     description: 'Secure your account with MFA',
@@ -18,7 +12,7 @@ const ONBOARDING_STEPS = [
   {
     id: 'gmail-sync',
     title: 'Connect Gmail',
-    description: 'Sync your job application emails',
+    description: 'Use the same Google account as your registration email. Sync only reads that inbox.',
     icon: '📧',
   },
   {
@@ -30,14 +24,13 @@ const ONBOARDING_STEPS = [
 ];
 
 /**
- * OnboardingChecklist - 4-step onboarding widget
+ * OnboardingChecklist - onboarding widget (MFA, Gmail, profile)
  */
 export function OnboardingChecklist({ userState = {} }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const openModal = useUIStore((state) => state.openModal);
 
   const completed = ONBOARDING_STEPS.filter((step) => {
-    if (step.id === 'email-verified') return userState.email_verified;
     if (step.id === 'mfa-enabled') return userState.mfa_enabled;
     if (step.id === 'gmail-sync') return userState.gmail_connected;
     if (step.id === 'profile-complete') return userState.profile_complete;
@@ -81,7 +74,6 @@ export function OnboardingChecklist({ userState = {} }) {
           <div className={styles.steps}>
             {ONBOARDING_STEPS.map((step) => {
               const isComplete =
-                (step.id === 'email-verified' && userState.email_verified) ||
                 (step.id === 'mfa-enabled' && userState.mfa_enabled) ||
                 (step.id === 'gmail-sync' && userState.gmail_connected) ||
                 (step.id === 'profile-complete' && userState.profile_complete);
@@ -92,9 +84,7 @@ export function OnboardingChecklist({ userState = {} }) {
                   step={step}
                   isComplete={isComplete}
                   onAction={() => {
-                    if (step.id === 'email-verified') {
-                      // Trigger email verification
-                    } else if (step.id === 'mfa-enabled') {
+                    if (step.id === 'mfa-enabled') {
                       openModal('mfaSetup');
                     } else if (step.id === 'gmail-sync') {
                       // Trigger Gmail connection
