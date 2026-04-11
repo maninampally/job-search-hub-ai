@@ -1,5 +1,7 @@
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { env } = require("../config/env");
 const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
+const { logger } = require("../utils/logger");
 
 /**
  * Generate an AI-powered cover letter for a job application
@@ -49,35 +51,16 @@ Format as plain text. Keep it under 250 words.
       wordCount: coverLetter.split(/\s+/).length,
     };
   } catch (error) {
-    console.error('[coverLetterService]:', error.message);
+    logger.error('[coverLetterService] generation failed', { error: error.message });
     throw new Error('Failed to generate cover letter: ' + error.message);
   }
 }
 
-/**
- * Call Google Gemini API
- * For production, use official Google Generative AI client
- * This is a placeholder implementation
- */
 async function callGemini(prompt) {
-  // In production:
-  // const { GoogleGenerativeAI } = require("@google/generative-ai");
-  // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  // const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-  // const result = await model.generateContent(prompt);
-  // return result.response.text();
-
-  // For now, return a template response
-  return `Dear Hiring Manager,
-
-I am excited to apply for the ${prompt.match(/Title: (.+)/)?.[1] || 'position'} role at ${prompt.match(/Company: (.+)/)?.[1] || 'your company'}. With my background in software development and passion for innovative solutions, I am confident I can deliver exceptional value to your team.
-
-Throughout my career, I have consistently delivered high-quality solutions and collaborated effectively with cross-functional teams. The requirements outlined in your job description align perfectly with my expertise and professional goals.
-
-I look forward to discussing how my skills and experience can contribute to your team's success. Thank you for considering my application.
-
-Best regards,
-${prompt.match(/Name: (.+)/)?.[1] || 'Applicant'}`;
+  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
 }
 
 module.exports = {

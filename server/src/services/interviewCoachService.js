@@ -1,5 +1,7 @@
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { env } = require("../config/env");
 const { sanitizeEmailForAI } = require("../security/dataLossPrevention");
+const { logger } = require("../utils/logger");
 
 /**
  * AI Interview Coach - Answer questions and get coaching feedback
@@ -53,7 +55,7 @@ FEEDBACK: [coaching feedback]
       ...parsed,
     };
   } catch (error) {
-    console.error('[interviewCoachService]:', error.message);
+    logger.error('[interviewCoachService] coaching failed', { error: error.message });
     throw new Error('Failed to get coaching: ' + error.message);
   }
 }
@@ -90,32 +92,16 @@ Provide ONLY the 5 questions as a numbered list. Each question should be about 1
       questions: questions.slice(0, 5),
     };
   } catch (error) {
-    console.error('[interviewCoachService getCommonQuestions]:', error.message);
+    logger.error('[interviewCoachService] getCommonQuestions failed', { error: error.message });
     throw new Error('Failed to get questions: ' + error.message);
   }
 }
 
-/**
- * Call Google Gemini API
- * Placeholder implementation - use official SDK in production
- */
 async function callGemini(prompt) {
-  // In production, use the official Google Generative AI SDK
-  // For now, return structured template responses
-
-  if (prompt.includes("common interview questions")) {
-    return `1. Tell me about yourself and how your background aligns with this role.
-2. What are your key strengths and how do they apply to this position?
-3. Describe your experience with [relevant technology/skill].
-4. How do you approach problem-solving when faced with a challenging situation?
-5. Why are you interested in joining our company?`;
-  }
-
-  return `ANSWER: I bring strong technical skills and a track record of delivering results. In my previous role, I [mentioned relevant achievement], which directly relates to the core responsibilities of this position. I'm excited about the opportunity to contribute to your team.
-
-PRO TIP: Use the STAR method (Situation, Task, Action, Result) to structure your answer and provide concrete examples.
-
-FEEDBACK: Avoid vague statements like "I'm a team player." Instead, demonstrate with specific examples. Make sure to show enthusiasm for the role and company.`;
+  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
 }
 
 /**
