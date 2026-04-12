@@ -1,0 +1,11 @@
+Hi [Name],
+
+I hope you are doing great! I wanted to follow up on my Data Engineer application at [Company] which I submitted on [date].
+
+I am genuinely very excited about this opportunity and remain confident that my 2+ years of experience building enterprise scale pipelines processing 35+ TB of data daily using PySpark, Spark, Databricks, Airflow, Kafka, and AWS is a strong fit for what the team needs.
+
+I would love to connect and learn more about the role and next steps. Looking forward to hearing from you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com
++1 (561) 542-6494

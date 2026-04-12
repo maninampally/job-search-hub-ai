@@ -1,0 +1,8 @@
+Hi [Name],
+
+I wanted to follow up on my message from last week regarding the Data Engineer opening at [Company]. I remain really excited about this opportunity and confident that my background in PySpark, Databricks and AWS scale pipelines is a strong match.
+
+Would love to connect and learn more about the role. Looking forward to hearing from you!
+
+Manikanth Nampally
+manikanthnampally94@gmail.com

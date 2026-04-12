@@ -1,0 +1,12 @@
+Hey [Name],
+
+Hope you are doing great! I have been following [Company]'s data engineering work and I am really impressed by what the team is building.
+
+I wanted to reach out because I would love to join [Company] as a Data Engineer when an opening comes up. Would you be open to referring me or letting me know when a role opens on your team?
+
+A quick background on me. I am a Data Engineer with 2+ years of experience building 35+ TB/day pipelines at LTIMindtree using PySpark, Spark, Databricks, Airflow, Kafka and AWS. Currently completing my MS at FAU with a 3.9 GPA, graduating May 2026.
+
+I would be really grateful for your support! Would love to catch up too.
+
+Manikanth
+manikanthnampally94@gmail.com | +1 (561) 542-6494

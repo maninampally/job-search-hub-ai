@@ -1,0 +1,1 @@
+Hi [Name], I wanted to follow up on my Data Engineer application at [Company] submitted on [date]. I remain really excited about this opportunity and confident my background in PySpark, Databricks and AWS scale pipelines is a strong match. Would love to connect!
