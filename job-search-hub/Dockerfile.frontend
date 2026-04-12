@@ -1,0 +1,26 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY client/package.json ./client/
+
+RUN cd client && npm install --legacy-peer-deps
+
+COPY client ./client
+
+ARG VITE_BACKEND_URL=http://localhost:3001
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+
+RUN cd client && npm run build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=builder /app/client/dist ./dist
+
+EXPOSE 5173
+
+CMD ["serve", "-s", "dist", "-l", "5173"]
