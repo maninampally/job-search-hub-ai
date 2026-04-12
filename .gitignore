@@ -36,6 +36,10 @@ server/data/
 server/uploads/
 client/build/
 audit-logs/
+# Nested app path (repo root contains job-search-hub/ folder)
+job-search-hub/server/data/
+job-search-hub/server/uploads/
+job-search-hub/client/build/
 
 # ============================================
 # PERSONAL/ROUGH WORK - Keep repo clean!
