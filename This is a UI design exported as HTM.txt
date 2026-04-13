@@ -1,0 +1,2625 @@
+
+
+
+This is a UI design exported as HTML/CSS from Banani. Integrate it into my project, adapting it to match my existing tech stack, component library, and styles. Preserve the layout, spacing, and visual design as closely as possible.
+
+Instructions:
+- Convert the HTML/CSS into components that fit my project's framework and conventions
+- Replace inline styles with my project's styling approach (e.g., Tailwind classes, CSS modules, styled-components)
+- Use existing UI components from my project where appropriate
+- Ensure the result is responsive and accessible
+- Remove any Banani-specific artifacts (export wrappers, CDN scripts)
+
+```html
+<design>
+<div
+  class="export-wrapper"
+  style="
+    width: 1440px;
+    min-height: 812px;
+    position: relative;
+    font-family: var(--font-family-body);
+    background-color: var(--background);
+  "
+>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@100;200;300;400;500;600;700;800;900&family=Geist:wght@100;200;300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@100;200;300;400;500;600;700&family=IBM+Plex+Sans:wght@100;200;300;400;500;600;700&family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Nunito:wght@200;300;400;500;600;700;800;900&family=PT+Serif:wght@400;700&family=Roboto+Slab:wght@100;200;300;400;500;600;700;800;900&family=Roboto:wght@100;300;400;500;700;900&family=Shantell+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <style id="base-styles">
+        * {
+          box-sizing: border-box;
+        }
+        .export-wrapper {
+          margin: 0;
+          background: var(--background);
+          color: var(--foreground);
+          font-family: var(
+            --font-family-body,
+            system-ui,
+            -apple-system,
+            sans-serif
+          );
+          -webkit-font-smoothing: antialiased;
+        }
+        .app-shell {
+          display: flex;
+          min-height: 812px;
+          width: 100%;
+          background: var(--background);
+        }
+        .icon-wrap {
+          width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .icon-wrap.sm {
+          width: 14px;
+          height: 14px;
+        }
+        .icon-wrap.md {
+          width: 16px;
+          height: 16px;
+        }
+        .icon-wrap.lg {
+          width: 20px;
+          height: 20px;
+        }
+        .muted {
+          color: var(--muted-foreground);
+        }
+        .pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: var(--radius-xl);
+          font-size: 12px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .pill-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: currentColor;
+        }
+        .card {
+          background: var(--card);
+          color: var(--card-foreground);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+        }
+        .section-card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          overflow: hidden;
+        }
+      </style>
+
+      <style id="sidebar-styles">
+        .sidebar {
+          width: 260px;
+          background: var(--sidebar);
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+        }
+        .sidebar-header {
+          padding: 24px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .brand-mark {
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-md);
+          background: var(--primary);
+          color: var(--primary-foreground);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .brand-name {
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--sidebar-foreground);
+          letter-spacing: -0.3px;
+          white-space: nowrap;
+        }
+        .nav-scroll {
+          flex: 1;
+          overflow-y: auto;
+          padding: 0 16px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .nav-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .nav-label {
+          padding: 0 12px;
+          margin-bottom: 8px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          color: var(--sidebar-foreground);
+          opacity: 0.5;
+        }
+        .nav-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border-radius: var(--radius-md);
+          color: var(--sidebar-foreground);
+          font-size: 14px;
+          font-weight: 500;
+          opacity: 0.82;
+          white-space: nowrap;
+        }
+        .nav-item.active {
+          background: var(--sidebar-primary);
+          color: var(--sidebar-primary-foreground);
+          opacity: 1;
+        }
+        .sidebar-footer {
+          padding: 16px;
+          border-top: 1px solid var(--border);
+        }
+        .tier-card {
+          padding: 16px;
+          border-radius: var(--radius-md);
+          background: color-mix(in srgb, var(--secondary) 78%, var(--card));
+          border: 1px solid var(--border);
+        }
+        .tier-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .tier-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--secondary-foreground);
+        }
+        .tier-copy {
+          font-size: 12px;
+          color: var(--secondary-foreground);
+          opacity: 0.82;
+          margin-bottom: 12px;
+        }
+        .tier-progress {
+          height: 6px;
+          border-radius: 999px;
+          background: var(--muted);
+          overflow: hidden;
+        }
+        .tier-progress > div {
+          height: 100%;
+          width: 80%;
+          background: var(--primary);
+        }
+      </style>
+
+      <style id="topbar-styles">
+        .content-shell {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+        }
+        .topbar {
+          height: 72px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 32px;
+          background: var(--background);
+        }
+        .topbar-title {
+          font-size: 20px;
+          font-weight: 600;
+          letter-spacing: -0.3px;
+          white-space: nowrap;
+        }
+        .topbar-actions {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .badge-soft {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: var(--radius-xl);
+          background: var(--secondary);
+          color: var(--secondary-foreground);
+          font-size: 13px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .account-email {
+          height: 32px;
+          padding: 0 16px;
+          border-left: 1px solid var(--border);
+          border-right: 1px solid var(--border);
+          color: var(--muted-foreground);
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        }
+        .btn {
+          height: 38px;
+          padding: 0 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border-radius: var(--radius-md);
+          font-size: 14px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .btn-primary {
+          background: var(--primary);
+          color: var(--primary-foreground);
+          border: none;
+        }
+        .btn-outline {
+          background: var(--background);
+          color: var(--foreground);
+          border: 1px solid var(--border);
+        }
+        .avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          overflow: hidden;
+          border: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+      </style>
+
+      <style id="layout-styles">
+        .page-scroll {
+          flex: 1;
+          overflow-y: auto;
+          padding: 24px 24px 32px;
+        }
+        .page-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .hero-panel {
+          padding: 24px;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+        }
+        .hero-copy {
+          max-width: 720px;
+        }
+        .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 10px;
+          border-radius: var(--radius-xl);
+          background: var(--secondary);
+          color: var(--secondary-foreground);
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 12px;
+          white-space: nowrap;
+        }
+        .hero-title {
+          font-size: 28px;
+          font-weight: 600;
+          line-height: 1.15;
+          letter-spacing: -0.6px;
+          margin: 0 0 12px;
+        }
+        .hero-text {
+          font-size: 14px;
+          color: var(--muted-foreground);
+          line-height: 1.6;
+          margin: 0;
+        }
+        .hero-meta {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          min-width: 440px;
+        }
+        .mini-metric {
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--card);
+        }
+        .mini-metric-label {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          margin-bottom: 8px;
+          white-space: nowrap;
+        }
+        .mini-metric-value {
+          font-size: 22px;
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+        .mini-metric-note {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .preview-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+          gap: 24px;
+        }
+        .module-block {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .module-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .module-title-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .module-eyebrow {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--primary);
+          white-space: nowrap;
+        }
+        .module-title {
+          font-size: 22px;
+          font-weight: 600;
+          letter-spacing: -0.4px;
+          margin: 0;
+        }
+        .module-subtitle {
+          font-size: 14px;
+          color: var(--muted-foreground);
+        }
+        .section-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+      </style>
+
+      <style id="dashboard-section-styles">
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+        }
+        .kpi-card {
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .kpi-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .kpi-label {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .kpi-value {
+          font-size: 32px;
+          font-weight: 600;
+          line-height: 1;
+        }
+        .kpi-note {
+          font-size: 13px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .overview-middle {
+          display: grid;
+          grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+          gap: 16px;
+        }
+        .chart-card,
+        .log-card {
+          padding: 24px;
+        }
+        .card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+        .card-title {
+          font-size: 16px;
+          font-weight: 600;
+          margin: 0;
+          white-space: nowrap;
+        }
+        .card-meta {
+          font-size: 13px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .chart {
+          height: 240px;
+          display: flex;
+          align-items: flex-end;
+          gap: 16px;
+          padding-top: 24px;
+        }
+        .bar-col {
+          flex: 1;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .bar-wrap {
+          flex: 1;
+          display: flex;
+          align-items: flex-end;
+          position: relative;
+        }
+        .bar {
+          width: 100%;
+          border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+          background: color-mix(in srgb, var(--primary) 24%, var(--card));
+        }
+        .bar.active {
+          background: var(--primary);
+        }
+        .bar-tip {
+          position: absolute;
+          top: -42px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 8px 10px;
+          border-radius: var(--radius-md);
+          background: var(--foreground);
+          color: var(--background);
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        .bar-label {
+          text-align: center;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .bar-label.active {
+          color: var(--foreground);
+          font-weight: 600;
+        }
+        .log-list {
+          display: flex;
+          flex-direction: column;
+        }
+        .log-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 16px 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .log-row:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .log-row:first-child {
+          padding-top: 0;
+        }
+        .log-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-md);
+          background: var(--secondary);
+          color: var(--primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .log-copy {
+          flex: 1;
+          min-width: 0;
+        }
+        .log-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 4px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .log-subtitle {
+          font-size: 13px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .log-time {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+      </style>
+
+      <style id="table-and-drawer-styles">
+        .table-shell {
+          overflow: hidden;
+        }
+        .table-header {
+          padding: 20px 24px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .filter-row {
+          padding: 16px 24px;
+          border-bottom: 1px solid var(--border);
+          display: grid;
+          grid-template-columns: minmax(220px, 1.2fr) repeat(
+              3,
+              minmax(140px, 0.6fr)
+            ) auto;
+          gap: 12px;
+          background: color-mix(in srgb, var(--muted) 45%, var(--card));
+        }
+        .fake-input {
+          min-height: 40px;
+          border: 1px solid var(--border);
+          background: var(--input);
+          border-radius: var(--radius-md);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 0 12px;
+          font-size: 14px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .data-region {
+          display: grid;
+          grid-template-columns: minmax(0, 1.35fr) 360px;
+          min-height: 520px;
+        }
+        .table-pane {
+          min-width: 0;
+          border-right: 1px solid var(--border);
+          overflow: hidden;
+        }
+        .table-scroll {
+          overflow-x: auto;
+        }
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .data-table th {
+          text-align: left;
+          padding: 16px 24px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          border-bottom: 1px solid var(--border);
+          white-space: nowrap;
+        }
+        .data-table td {
+          padding: 16px 24px;
+          border-bottom: 1px solid var(--border);
+          font-size: 14px;
+          vertical-align: middle;
+        }
+        .company-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+        .company-logo {
+          width: 36px;
+          height: 36px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border);
+          background: var(--secondary);
+          color: var(--muted-foreground);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .company-text {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .company-name,
+        .action-link {
+          white-space: nowrap;
+        }
+        .company-name {
+          font-size: 14px;
+          font-weight: 500;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .company-note {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .source-line {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .stage-applied {
+          background: var(--secondary);
+          color: var(--secondary-foreground);
+        }
+        .stage-interview {
+          background: var(--warning);
+          color: var(--warning-foreground);
+        }
+        .stage-offer {
+          background: var(--success);
+          color: var(--success-foreground);
+        }
+        .stage-rejected {
+          background: var(--destructive);
+          color: var(--destructive-foreground);
+        }
+        .action-link {
+          color: var(--primary);
+          font-size: 13px;
+          font-weight: 500;
+          display: inline-flex;
+        }
+        .drawer {
+          background: var(--card);
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .drawer-header {
+          padding: 24px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .drawer-top {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        .drawer-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: var(--radius-md);
+          background: var(--secondary);
+          border: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--primary);
+          flex-shrink: 0;
+        }
+        .drawer-title {
+          font-size: 18px;
+          font-weight: 600;
+          margin: 0 0 4px;
+        }
+        .drawer-role {
+          font-size: 14px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .drawer-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .tabs {
+          padding: 0 24px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          overflow-x: auto;
+        }
+        .tab {
+          padding: 14px 12px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          border-bottom: 2px solid transparent;
+          white-space: nowrap;
+        }
+        .tab.active {
+          color: var(--foreground);
+          border-color: var(--primary);
+        }
+        .drawer-body {
+          padding: 20px 24px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          overflow-y: auto;
+        }
+        .info-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .info-card,
+        .subcard {
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: color-mix(in srgb, var(--muted) 28%, var(--card));
+        }
+        .subcard {
+          background: var(--card);
+        }
+        .info-label {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          margin-bottom: 8px;
+          white-space: nowrap;
+        }
+        .info-value {
+          font-size: 14px;
+          font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .timeline-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .timeline-row {
+          display: grid;
+          grid-template-columns: 70px 1fr;
+          gap: 12px;
+          align-items: start;
+        }
+        .timeline-time {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+          padding-top: 2px;
+        }
+        .timeline-card {
+          padding: 14px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--card);
+        }
+        .timeline-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 4px;
+        }
+        .timeline-copy {
+          font-size: 13px;
+          color: var(--muted-foreground);
+          line-height: 1.5;
+        }
+      </style>
+
+      <style id="secondary-module-styles">
+        .two-col {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 24px;
+        }
+        .mini-section {
+          overflow: hidden;
+        }
+        .mini-head {
+          padding: 20px 24px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .mini-body {
+          padding: 20px 24px;
+        }
+        .table-mini {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .table-mini th {
+          padding: 0 0 12px;
+          text-align: left;
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .table-mini td {
+          padding: 14px 0;
+          font-size: 14px;
+          border-top: 1px solid var(--border);
+          vertical-align: middle;
+        }
+        .contact-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+        .contact-cell .avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+        }
+        .stack-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .resource-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: color-mix(in srgb, var(--muted) 22%, var(--card));
+        }
+        .resource-main {
+          min-width: 0;
+        }
+        .resource-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 4px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .resource-meta {
+          font-size: 12px;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .qa-card {
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--card);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .qa-question {
+          font-size: 14px;
+          font-weight: 500;
+          line-height: 1.5;
+        }
+        .qa-answer {
+          font-size: 13px;
+          color: var(--muted-foreground);
+          line-height: 1.6;
+        }
+        .settings-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+        .setting-item {
+          padding: 18px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: color-mix(in srgb, var(--muted) 20%, var(--card));
+        }
+        .setting-title {
+          font-size: 14px;
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+        .setting-copy {
+          font-size: 13px;
+          color: var(--muted-foreground);
+          line-height: 1.5;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="job-search-hub-app" class="app-shell">
+        <aside id="main-sidebar" class="sidebar">
+          <div class="sidebar-header">
+            <div class="brand-mark">
+              <div class="icon-wrap">
+                <iconify-icon
+                  icon="lucide:target"
+                  style="font-size: 18px"
+                ></iconify-icon>
+              </div>
+            </div>
+            <div class="brand-name">Job Search Hub</div>
+          </div>
+
+          <div class="nav-scroll">
+            <div class="nav-group">
+              <div class="nav-label">Dashboard</div>
+              <div class="nav-item active" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:layout-dashboard"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Overview
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:briefcase-business"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Applications
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:chart-column"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Analytics
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <div class="nav-label">Network</div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:users"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Contacts &amp; Recruiters
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:send"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Outreach Tracker
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <div class="nav-label">Toolkit</div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:file-text"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Resumes &amp; Cover Letters
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:mic"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Interview Prep
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:files"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Templates
+              </div>
+            </div>
+
+            <div class="nav-group">
+              <div class="nav-label">System</div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:settings"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Settings
+              </div>
+              <div class="nav-item" data-media-type="banani-button">
+                <div class="icon-wrap">
+                  <iconify-icon
+                    icon="lucide:shield-check"
+                    style="font-size: 18px"
+                  ></iconify-icon>
+                </div>
+                Admin Panel
+              </div>
+            </div>
+          </div>
+
+          <div class="sidebar-footer">
+            <div class="tier-card">
+              <div class="tier-top">
+                <div class="tier-title">Pro Tier</div>
+                <div class="icon-wrap sm">
+                  <iconify-icon
+                    icon="lucide:zap"
+                    style="font-size: 14px; color: var(--warning)"
+                  ></iconify-icon>
+                </div>
+              </div>
+              <div class="tier-copy">4/5 Gmail syncs used today</div>
+              <div class="tier-progress"><div></div></div>
+            </div>
+          </div>
+        </aside>
+
+        <main class="content-shell">
+          <div class="topbar">
+            <div class="topbar-title">Command Center</div>
+            <div class="topbar-actions">
+              <div class="badge-soft">
+                <div class="icon-wrap sm">
+                  <iconify-icon
+                    icon="lucide:sparkles"
+                    style="font-size: 14px; color: var(--primary)"
+                  ></iconify-icon>
+                </div>
+                Gemini AI Active
+              </div>
+              <div class="account-email">
+                <div class="icon-wrap sm">
+                  <iconify-icon
+                    icon="lucide:mail"
+                    style="font-size: 14px"
+                  ></iconify-icon>
+                </div>
+                alex@gmail.com
+              </div>
+              <div class="btn btn-primary" data-media-type="banani-button">
+                <div class="icon-wrap md">
+                  <iconify-icon
+                    icon="lucide:refresh-cw"
+                    style="font-size: 16px"
+                  ></iconify-icon>
+                </div>
+                Sync Inbox
+              </div>
+              <div class="avatar">
+                <img
+                  src="https://storage.googleapis.com/banani-avatars/avatar%2Fmale%2F25-35%2FEuropean%2F1"
+                  alt="Alex"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="page-scroll">
+            <div class="page-stack">
+              <section id="hero-summary" class="section-card hero-panel">
+                <div class="hero-copy">
+                  <div class="eyebrow">
+                    <div class="icon-wrap sm">
+                      <iconify-icon
+                        icon="lucide:workflow"
+                        style="font-size: 14px; color: var(--primary)"
+                      ></iconify-icon>
+                    </div>
+                    Composite app preview
+                  </div>
+                  <h1 class="hero-title">
+                    A polished job search command center built around the
+                    dashboard visual language.
+                  </h1>
+                  <p class="hero-text">
+                    This screen expands the reference into a full desktop web
+                    app preview: overview metrics, a table-driven applications
+                    workspace with a right-side detail drawer, and matching
+                    modules for contacts, outreach, resumes, interview prep,
+                    settings, and admin. Everything stays card and table based,
+                    with the dashboard receiving the strongest visual emphasis.
+                  </p>
+                </div>
+                <div class="hero-meta">
+                  <div class="mini-metric">
+                    <div class="mini-metric-label">Emails parsed today</div>
+                    <div class="mini-metric-value">86</div>
+                    <div class="mini-metric-note">
+                      Gemini primary · GPT fallback
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <div class="mini-metric-label">Open follow-ups</div>
+                    <div class="mini-metric-value">14</div>
+                    <div class="mini-metric-note">
+                      6 due in the next 48 hours
+                    </div>
+                  </div>
+                  <div class="mini-metric">
+                    <div class="mini-metric-label">Production status</div>
+                    <div class="mini-metric-value">Ready</div>
+                    <div class="mini-metric-note">
+                      MVP deployed · Stripe live
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="overview-module" class="module-block">
+                <div class="module-heading">
+                  <div class="module-title-wrap">
+                    <div class="module-eyebrow">Overview dashboard</div>
+                    <h2 class="module-title">Primary experience</h2>
+                    <div class="module-subtitle">
+                      Same table-first SaaS visual system as the reference,
+                      refined into a fuller app surface.
+                    </div>
+                  </div>
+                  <div class="section-actions">
+                    <div
+                      class="btn btn-outline"
+                      data-media-type="banani-button"
+                    >
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:download"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                      Export Report
+                    </div>
+                    <div
+                      class="btn btn-primary"
+                      data-media-type="banani-button"
+                    >
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:plus"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                      Add Application
+                    </div>
+                  </div>
+                </div>
+
+                <div class="kpi-grid">
+                  <div class="card kpi-card">
+                    <div class="kpi-top">
+                      <div class="kpi-label">Total Applications</div>
+                      <div class="icon-wrap">
+                        <iconify-icon
+                          icon="lucide:briefcase"
+                          style="
+                            font-size: 18px;
+                            color: var(--muted-foreground);
+                          "
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="kpi-value">124</div>
+                    <div class="kpi-note" style="color: var(--success)">
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:trending-up"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                      +12 this week · 31 from Gmail sync
+                    </div>
+                  </div>
+                  <div class="card kpi-card">
+                    <div class="kpi-top">
+                      <div class="kpi-label">Active Interviews</div>
+                      <div class="icon-wrap">
+                        <iconify-icon
+                          icon="lucide:calendar"
+                          style="
+                            font-size: 18px;
+                            color: var(--muted-foreground);
+                          "
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="kpi-value">7</div>
+                    <div class="kpi-note muted">
+                      2 recruiter screens · 5 onsite loops
+                    </div>
+                  </div>
+                  <div class="card kpi-card">
+                    <div class="kpi-top">
+                      <div class="kpi-label">Offers</div>
+                      <div class="icon-wrap">
+                        <iconify-icon
+                          icon="lucide:award"
+                          style="
+                            font-size: 18px;
+                            color: var(--muted-foreground);
+                          "
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="kpi-value">1</div>
+                    <div class="kpi-note muted">
+                      Awaiting response by Friday
+                    </div>
+                  </div>
+                  <div class="card kpi-card">
+                    <div class="kpi-top">
+                      <div class="kpi-label">Rejections</div>
+                      <div class="icon-wrap">
+                        <iconify-icon
+                          icon="lucide:x-circle"
+                          style="
+                            font-size: 18px;
+                            color: var(--muted-foreground);
+                          "
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="kpi-value">32</div>
+                    <div class="kpi-note muted">
+                      11 automated status updates captured
+                    </div>
+                  </div>
+                </div>
+
+                <div class="overview-middle">
+                  <div class="section-card chart-card">
+                    <div class="card-head">
+                      <h3 class="card-title">Application Activity</h3>
+                      <div class="card-meta">Last 7 Days</div>
+                    </div>
+                    <div class="chart">
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 34%"></div>
+                        </div>
+                        <div class="bar-label">Mon</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 52%"></div>
+                        </div>
+                        <div class="bar-label">Tue</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 26%"></div>
+                        </div>
+                        <div class="bar-label">Wed</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 68%"></div>
+                        </div>
+                        <div class="bar-label">Thu</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar active" style="height: 82%">
+                            <div class="bar-tip">12</div>
+                          </div>
+                        </div>
+                        <div class="bar-label active">Fri</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 18%"></div>
+                        </div>
+                        <div class="bar-label">Sat</div>
+                      </div>
+                      <div class="bar-col">
+                        <div class="bar-wrap">
+                          <div class="bar" style="height: 10%"></div>
+                        </div>
+                        <div class="bar-label">Sun</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section-card log-card">
+                    <div class="card-head">
+                      <h3 class="card-title">
+                        Recent Job Emails / AI Extractions
+                      </h3>
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:info"
+                          style="
+                            font-size: 14px;
+                            color: var(--muted-foreground);
+                          "
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="log-list">
+                      <div class="log-row">
+                        <div class="log-icon">
+                          <iconify-icon
+                            icon="lucide:sparkles"
+                            style="font-size: 16px"
+                          ></iconify-icon>
+                        </div>
+                        <div class="log-copy">
+                          <div class="log-title">Extracted application</div>
+                          <div class="log-subtitle">
+                            Netflix · Product Designer · Stage set to Applied
+                          </div>
+                        </div>
+                        <div class="log-time">10m ago</div>
+                      </div>
+                      <div class="log-row">
+                        <div class="log-icon">
+                          <iconify-icon
+                            icon="lucide:calendar-clock"
+                            style="font-size: 16px"
+                          ></iconify-icon>
+                        </div>
+                        <div class="log-copy">
+                          <div class="log-title">Interview scheduled</div>
+                          <div class="log-subtitle">
+                            Spotify · Frontend Engineer · Recruiter call next
+                            Tuesday
+                          </div>
+                        </div>
+                        <div class="log-time">2h ago</div>
+                      </div>
+                      <div class="log-row">
+                        <div class="log-icon">
+                          <iconify-icon
+                            icon="lucide:mail-check"
+                            style="font-size: 16px"
+                          ></iconify-icon>
+                        </div>
+                        <div class="log-copy">
+                          <div class="log-title">Offer packet detected</div>
+                          <div class="log-subtitle">
+                            Stripe · Fullstack Engineer · Compensation summary
+                            parsed
+                          </div>
+                        </div>
+                        <div class="log-time">4h ago</div>
+                      </div>
+                      <div class="log-row">
+                        <div class="log-icon">
+                          <iconify-icon
+                            icon="lucide:shield-alert"
+                            style="font-size: 16px"
+                          ></iconify-icon>
+                        </div>
+                        <div class="log-copy">
+                          <div class="log-title">DLP sanitization applied</div>
+                          <div class="log-subtitle">
+                            Sensitive personal data stripped before AI
+                            extraction
+                          </div>
+                        </div>
+                        <div class="log-time">6h ago</div>
+                      </div>
+                    </div>
+                    <div
+                      style="
+                        padding-top: 20px;
+                        text-align: center;
+                        color: var(--primary);
+                        font-size: 13px;
+                        font-weight: 500;
+                      "
+                      data-media-type="banani-button"
+                    >
+                      View full sync log
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section-card table-shell">
+                  <div class="table-header">
+                    <h3 class="card-title">Active Applications</h3>
+                    <div
+                      class="btn btn-outline"
+                      data-media-type="banani-button"
+                    >
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:filter"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                      Filter
+                    </div>
+                  </div>
+                  <div class="table-scroll">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Stage</th>
+                          <th>Source</th>
+                          <th>Last Activity</th>
+                          <th style="text-align: right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <div class="company-cell">
+                              <div class="company-logo">
+                                <iconify-icon
+                                  icon="lucide:building-2"
+                                  style="font-size: 16px"
+                                ></iconify-icon>
+                              </div>
+                              <div class="company-text">
+                                <div class="company-name">Google</div>
+                                <div class="company-note">
+                                  3 messages extracted
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>Senior Software Engineer</td>
+                          <td>
+                            <div class="pill stage-interview">
+                              <div class="pill-dot"></div>
+                              Interviewing
+                            </div>
+                          </td>
+                          <td>
+                            <div class="source-line">
+                              <div class="icon-wrap sm">
+                                <iconify-icon
+                                  icon="lucide:mail"
+                                  style="font-size: 14px"
+                                ></iconify-icon>
+                              </div>
+                              Gmail Sync
+                            </div>
+                          </td>
+                          <td class="muted">2 hours ago</td>
+                          <td style="text-align: right">
+                            <div
+                              class="action-link"
+                              data-media-type="banani-button"
+                            >
+                              View Details
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="company-cell">
+                              <div class="company-logo">
+                                <iconify-icon
+                                  icon="lucide:building-2"
+                                  style="font-size: 16px"
+                                ></iconify-icon>
+                              </div>
+                              <div class="company-text">
+                                <div class="company-name">Meta</div>
+                                <div class="company-note">
+                                  Resume A submitted
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>Frontend Developer</td>
+                          <td>
+                            <div class="pill stage-applied">
+                              <div class="pill-dot"></div>
+                              Applied
+                            </div>
+                          </td>
+                          <td>
+                            <div class="source-line">
+                              <div class="icon-wrap sm">
+                                <iconify-icon
+                                  icon="lucide:mouse-pointer-click"
+                                  style="font-size: 14px"
+                                ></iconify-icon>
+                              </div>
+                              Manual Entry
+                            </div>
+                          </td>
+                          <td class="muted">1 day ago</td>
+                          <td style="text-align: right">
+                            <div
+                              class="action-link"
+                              data-media-type="banani-button"
+                            >
+                              View Details
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="company-cell">
+                              <div class="company-logo">
+                                <iconify-icon
+                                  icon="lucide:building-2"
+                                  style="font-size: 16px"
+                                ></iconify-icon>
+                              </div>
+                              <div class="company-text">
+                                <div class="company-name">Stripe</div>
+                                <div class="company-note">
+                                  Offer details parsed
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>Fullstack Engineer</td>
+                          <td>
+                            <div class="pill stage-offer">
+                              <div class="pill-dot"></div>
+                              Offer Extended
+                            </div>
+                          </td>
+                          <td>
+                            <div class="source-line">
+                              <div class="icon-wrap sm">
+                                <iconify-icon
+                                  icon="lucide:mail"
+                                  style="font-size: 14px"
+                                ></iconify-icon>
+                              </div>
+                              Gmail Sync
+                            </div>
+                          </td>
+                          <td class="muted">3 days ago</td>
+                          <td style="text-align: right">
+                            <div
+                              class="action-link"
+                              data-media-type="banani-button"
+                            >
+                              View Details
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="company-cell">
+                              <div class="company-logo">
+                                <iconify-icon
+                                  icon="lucide:building-2"
+                                  style="font-size: 16px"
+                                ></iconify-icon>
+                              </div>
+                              <div class="company-text">
+                                <div class="company-name">Amazon</div>
+                                <div class="company-note">
+                                  Auto-updated from inbox
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>SDE II</td>
+                          <td>
+                            <div class="pill stage-rejected">
+                              <div class="pill-dot"></div>
+                              Rejected
+                            </div>
+                          </td>
+                          <td>
+                            <div class="source-line">
+                              <div class="icon-wrap sm">
+                                <iconify-icon
+                                  icon="lucide:mail"
+                                  style="font-size: 14px"
+                                ></iconify-icon>
+                              </div>
+                              Gmail Sync
+                            </div>
+                          </td>
+                          <td class="muted">5 days ago</td>
+                          <td style="text-align: right">
+                            <div
+                              class="action-link"
+                              data-media-type="banani-button"
+                            >
+                              View Details
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+
+              <section id="applications-module" class="module-block">
+                <div class="module-heading">
+                  <div class="module-title-wrap">
+                    <div class="module-eyebrow">Applications page</div>
+                    <h2 class="module-title">
+                      Table workspace with detail drawer
+                    </h2>
+                    <div class="module-subtitle">
+                      No Kanban anywhere — the applications experience stays
+                      centered on search, filtering, dense tables, and a
+                      right-side job drawer.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section-card table-shell">
+                  <div class="table-header">
+                    <h3 class="card-title">All Applications</h3>
+                    <div class="section-actions">
+                      <div class="badge-soft">
+                        <div class="icon-wrap sm">
+                          <iconify-icon
+                            icon="lucide:sliders-horizontal"
+                            style="font-size: 14px; color: var(--primary)"
+                          ></iconify-icon>
+                        </div>
+                        Same density as reference
+                      </div>
+                      <div
+                        class="btn btn-primary"
+                        data-media-type="banani-button"
+                      >
+                        <div class="icon-wrap sm">
+                          <iconify-icon
+                            icon="lucide:plus"
+                            style="font-size: 14px"
+                          ></iconify-icon>
+                        </div>
+                        New Entry
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="filter-row">
+                    <div class="fake-input" id="filter-search">
+                      <span>Search company or role</span>
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:search"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="fake-input" id="filter-stage">
+                      <span>All Stages</span>
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:chevron-down"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="fake-input" id="filter-source">
+                      <span>All Sources</span>
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:chevron-down"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div class="fake-input" id="filter-date">
+                      <span>Last 30 days</span>
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:calendar-range"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                    </div>
+                    <div
+                      class="btn btn-outline"
+                      data-media-type="banani-button"
+                    >
+                      <div class="icon-wrap sm">
+                        <iconify-icon
+                          icon="lucide:rotate-ccw"
+                          style="font-size: 14px"
+                        ></iconify-icon>
+                      </div>
+                      Reset
+                    </div>
+                  </div>
+
+                  <div class="data-region">
+                    <div class="table-pane">
+                      <div class="table-scroll">
+                        <table class="data-table">
+                          <thead>
+                            <tr>
+                              <th>Company</th>
+                              <th>Role</th>
+                              <th>Stage</th>
+                              <th>Source</th>
+                              <th>Last Activity</th>
+                              <th style="text-align: right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>
+                                <div class="company-cell">
+                                  <div class="company-logo">
+                                    <iconify-icon
+                                      icon="lucide:building-2"
+                                      style="font-size: 16px"
+                                    ></iconify-icon>
+                                  </div>
+                                  <div class="company-text">
+                                    <div class="company-name">Figma</div>
+                                    <div class="company-note">
+                                      Recruiter: Maya Patel
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>Product Designer</td>
+                              <td>
+                                <div class="pill stage-interview">
+                                  <div class="pill-dot"></div>
+                                  Interviewing
+                                </div>
+                              </td>
+                              <td>
+                                <div class="source-line">
+                                  <div class="icon-wrap sm">
+                                    <iconify-icon
+                                      icon="lucide:mail"
+                                      style="font-size: 14px"
+                                    ></iconify-icon>
+                                  </div>
+                                  Gmail Sync
+                                </div>
+                              </td>
+                              <td class="muted">28 min ago</td>
+                              <td style="text-align: right">
+                                <div
+                                  class="action-link"
+                                  data-media-type="banani-button"
+                                >
+                                  View Details
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <div class="company-cell">
+                                  <div class="company-logo">
+                                    <iconify-icon
+                                      icon="lucide:building-2"
+                                      style="font-size: 16px"
+                                    ></iconify-icon>
+                                  </div>
+                                  <div class="company-text">
+                                    <div class="company-name">Linear</div>
+                                    <div class="company-note">
+                                      Referral from Noah Kim
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>Frontend Engineer</td>
+                              <td>
+                                <div class="pill stage-applied">
+                                  <div class="pill-dot"></div>
+                                  Applied
+                                </div>
+                              </td>
+                              <td>
+                                <div class="source-line">
+                                  <div class="icon-wrap sm">
+                                    <iconify-icon
+                                      icon="lucide:mouse-pointer-click"
+                                      style="font-size: 14px"
+                                    ></iconify-icon>
+                                  </div>
+                                  Manual Entry
+                                </div>
+                              </td>
+                              <td class="muted">1 day ago</td>
+                              <td style="text-align: right">
+                                <div
+                                  class="action-link"
+                                  data-media-type="banani-button"
+                                >
+                                  View Details
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <div class="company-cell">
+                                  <div class="company-logo">
+                                    <iconify-icon
+                                      icon="lucide:building-2"
+                                      style="font-size: 16px"
+                                    ></iconify-icon>
+                                  </div>
+                                  <div class="company-text">
+                                    <div class="company-name">Notion</div>
+                                    <div class="company-note">
+                                      Portfolio review requested
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>Design Systems Lead</td>
+                              <td>
+                                <div class="pill stage-interview">
+                                  <div class="pill-dot"></div>
+                                  Interviewing
+                                </div>
+                              </td>
+                              <td>
+                                <div class="source-line">
+                                  <div class="icon-wrap sm">
+                                    <iconify-icon
+                                      icon="lucide:mail"
+                                      style="font-size: 14px"
+                                    ></iconify-icon>
+                                  </div>
+                                  Gmail Sync
+                                </div>
+                              </td>
+                              <td class="muted">Yesterday</td>
+                              <td style="text-align: right">
+                                <div
+                                  class="action-link"
+                                  data-media-type="banani-button"
+                                >
+                                  View Details
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <div class="company-cell">
+                                  <div class="company-logo">
+                                    <iconify-icon
+                                      icon="lucide:building-2"
+                                      style="font-size: 16px"
+                                    ></iconify-icon>
+                                  </div>
+                                  <div class="company-text">
+                                    <div class="company-name">Airbnb</div>
+                                    <div class="company-note">
+                                      Offer packet in attachments
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>Senior Product Designer</td>
+                              <td>
+                                <div class="pill stage-offer">
+                                  <div class="pill-dot"></div>
+                                  Offer Extended
+                                </div>
+                              </td>
+                              <td>
+                                <div class="source-line">
+                                  <div class="icon-wrap sm">
+                                    <iconify-icon
+                                      icon="lucide:mail"
+                                      style="font-size: 14px"
+                                    ></iconify-icon>
+                                  </div>
+                                  Gmail Sync
+                                </div>
+                              </td>
+                              <td class="muted">2 days ago</td>
+                              <td style="text-align: right">
+                                <div
+                                  class="action-link"
+                                  data-media-type="banani-button"
+                                >
+                                  View Details
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <div class="company-cell">
+                                  <div class="company-logo">
+                                    <iconify-icon
+                                      icon="lucide:building-2"
+                                      style="font-size: 16px"
+                                    ></iconify-icon>
+                                  </div>
+                                  <div class="company-text">
+                                    <div class="company-name">Vercel</div>
+                                    <div class="company-note">
+                                      Awaiting response after application
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>Developer Experience Engineer</td>
+                              <td>
+                                <div class="pill stage-applied">
+                                  <div class="pill-dot"></div>
+                                  Applied
+                                </div>
+                              </td>
+                              <td>
+                                <div class="source-line">
+                                  <div class="icon-wrap sm">
+                                    <iconify-icon
+                                      icon="lucide:mail"
+                                      style="font-size: 14px"
+                                    ></iconify-icon>
+                                  </div>
+                                  Gmail Sync
+                                </div>
+                              </td>
+                              <td class="muted">4 days ago</td>
+                              <td style="text-align: right">
+                                <div
+                                  class="action-link"
+                                  data-media-type="banani-button"
+                                >
+                                  View Details
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <aside id="job-detail-drawer" class="drawer">
+                      <div class="drawer-header">
+                        <div class="drawer-top">
+                          <div class="drawer-avatar">
+                            <iconify-icon
+                              icon="lucide:figma"
+                              style="font-size: 20px"
+                            ></iconify-icon>
+                          </div>
+                          <div style="min-width: 0; flex: 1">
+                            <h3 class="drawer-title">Figma</h3>
+                            <div class="drawer-role">Product Designer</div>
+                          </div>
+                        </div>
+                        <div class="drawer-controls">
+                          <div class="fake-input" style="min-width: 136px">
+                            <span>Interviewing</span>
+                            <div class="icon-wrap sm">
+                              <iconify-icon
+                                icon="lucide:chevron-down"
+                                style="font-size: 14px"
+                              ></iconify-icon>
+                            </div>
+                          </div>
+                          <div
+                            class="btn btn-outline"
+                            data-media-type="banani-button"
+                          >
+                            <div class="icon-wrap sm">
+                              <iconify-icon
+                                icon="lucide:bell-plus"
+                                style="font-size: 14px"
+                              ></iconify-icon>
+                            </div>
+                            Add Reminder
+                          </div>
+                          <div
+                            class="btn btn-primary"
+                            data-media-type="banani-button"
+                          >
+                            <div class="icon-wrap sm">
+                              <iconify-icon
+                                icon="lucide:mail-open"
+                                style="font-size: 14px"
+                              ></iconify-icon>
+                            </div>
+                            Open in Gmail
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="tabs">
+                        <div class="tab active" data-media-type="banani-button">
+                          Overview
+                        </div>
+                        <div class="tab" data-media-type="banani-button">
+                          Email Log
+                        </div>
+                        <div class="tab" data-media-type="banani-button">
+                          Timeline
+                        </div>
+                        <div class="tab" data-media-type="banani-button">
+                          Notes &amp; Interview Prep
+                        </div>
+                        <div class="tab" data-media-type="banani-button">
+                          Attachments
+                        </div>
+                      </div>
+
+                      <div class="drawer-body">
+                        <div class="info-grid">
+                          <div class="info-card">
+                            <div class="info-label">Recruiter</div>
+                            <div class="info-value">Maya Patel · figma.com</div>
+                          </div>
+                          <div class="info-card">
+                            <div class="info-label">Applied via</div>
+                            <div class="info-value">
+                              Gmail Sync · Career Site
+                            </div>
+                          </div>
+                          <div class="info-card">
+                            <div class="info-label">Next step</div>
+                            <div class="info-value">
+                              Portfolio presentation · Thu 2:00 PM
+                            </div>
+                          </div>
+                          <div class="info-card">
+                            <div class="info-label">Resume used</div>
+                            <div class="info-value">Product-Design-v3.pdf</div>
+                          </div>
+                        </div>
+
+                        <div class="subcard">
+                          <div class="info-label">Overview</div>
+                          <div class="qa-answer">
+                            AI extracted the application confirmation, recruiter
+                            outreach, and interview scheduling emails into a
+                            unified job record. The candidate is currently
+                            preparing a portfolio walkthrough and has a
+                            follow-up reminder set for compensation questions
+                            after the final round.
+                          </div>
+                        </div>
+
+                        <div class="subcard">
+                          <div class="info-label">Email Log</div>
+                          <div class="timeline-list">
+                            <div class="timeline-row">
+                              <div class="timeline-time">Today</div>
+                              <div class="timeline-card">
+                                <div class="timeline-title">
+                                  Interview schedule parsed
+                                </div>
+                                <div class="timeline-copy">
+                                  Gemini extracted date, time, recruiter, and
+                                  Zoom link from the latest email thread.
+                                </div>
+                              </div>
+                            </div>
+                            <div class="timeline-row">
+                              <div class="timeline-time">Tue</div>
+                              <div class="timeline-card">
+                                <div class="timeline-title">
+                                  Recruiter follow-up
+                                </div>
+                                <div class="timeline-copy">
+                                  Open question about case study expectations
+                                  captured and linked to notes.
+                                </div>
+                              </div>
+                            </div>
+                            <div class="timeline-row">
+                              <div class="timeline-time">Mon</div>
+                              <div class="timeline-card">
+                                <div class="timeline-title">
+                                  Application confirmation
+                                </div>
+                                <div class="timeline-copy">
+                                  Role, team, and source metadata created
+                                  automatically in the database.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="subcard">
+                          <div class="info-label">
+                            Notes &amp; Interview Prep
+                          </div>
+                          <div class="qa-card">
+                            <div class="qa-question">
+                              How would you explain your design process for
+                              ambiguous product problems?
+                            </div>
+                            <div class="qa-answer">
+                              Anchor on discovery, constraints, trade-offs, and
+                              measurable outcomes. Use one portfolio story to
+                              show collaboration with product and engineering.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="subcard">
+                          <div class="info-label">Attachments</div>
+                          <div class="resource-row">
+                            <div class="resource-main">
+                              <div class="resource-title">
+                                Portfolio-case-study.pdf
+                              </div>
+                              <div class="resource-meta">
+                                Uploaded 2 days ago · 8.2 MB
+                              </div>
+                            </div>
+                            <div
+                              class="action-link"
+                              data-media-type="banani-button"
+                            >
+                              Open
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </aside>
+                  </div>
+                </div>
+              </section>
+
+              <section id="secondary-modules" class="module-block">
+                <div class="module-heading">
+                  <div class="module-title-wrap">
+                    <div class="module-eyebrow">Other app surfaces</div>
+                    <h2 class="module-title">
+                      Matching modules across the product
+                    </h2>
+                    <div class="module-subtitle">
+                      Every page inherits the same sidebar, top bar, restrained
+                      cards, and dense tables from the dashboard reference.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="two-col">
+                  <div class="section-card mini-section" id="contacts-module">
+                    <div class="mini-head">
+                      <h3 class="card-title">Contacts &amp; Recruiters</h3>
+                      <div
+                        class="btn btn-outline"
+                        data-media-type="banani-button"
+                      >
+                        Import CSV
+                      </div>
+                    </div>
+                    <div class="mini-body">
+                      <table class="table-mini">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Relationship</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>
+                              <div class="contact-cell">
+                                <div class="avatar">
+                                  <img
+                                    src="https://storage.googleapis.com/banani-avatars/avatar%2Ffemale%2F25-35%2FSouth%20Asian%2F2"
+                                    alt="Maya"
+                                  />
+                                </div>
+                                <span>Maya Patel</span>
+                              </div>
+                            </td>
+                            <td>Figma</td>
+                            <td>Recruiter</td>
+                            <td>
+                              <div class="pill stage-applied">
+                                <div class="pill-dot"></div>
+                                Active
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <div class="contact-cell">
+                                <div class="avatar">
+                                  <img
+                                    src="https://storage.googleapis.com/banani-avatars/avatar%2Fmale%2F25-35%2FEast%20Asian%2F4"
+                                    alt="Noah"
+                                  />
+                                </div>
+                                <span>Noah Kim</span>
+                              </div>
+                            </td>
+                            <td>Linear</td>
+                            <td>Referral</td>
+                            <td>
+                              <div class="pill stage-interview">
+                                <div class="pill-dot"></div>
+                                Warm Intro
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <div class="contact-cell">
+                                <div class="avatar">
+                                  <img
+                                    src="https://storage.googleapis.com/banani-avatars/avatar%2Ffemale%2F25-35%2FEuropean%2F5"
+                                    alt="Elena"
+                                  />
+                                </div>
+                                <span>Elena Morris</span>
+                              </div>
+                            </td>
+                            <td>Notion</td>
+                            <td>Hiring Manager</td>
+                            <td>
+                              <div class="pill stage-offer">
+                                <div class="pill-dot"></div>
+                                Interview Loop
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="section-card mini-section" id="outreach-module">
+                    <div class="mini-head">
+                      <h3 class="card-title">Outreach Tracker</h3>
+                      <div
+                        class="btn btn-outline"
+                        data-media-type="banani-button"
+                      >
+                        Add Follow-up
+                      </div>
+                    </div>
+                    <div class="mini-body">
+                      <table class="table-mini">
+                        <thead>
+                          <tr>
+                            <th>Contact</th>
+                            <th>Channel</th>
+                            <th>Last Touch</th>
+                            <th>Next Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Maya Patel</td>
+                            <td>Email</td>
+                            <td>Today</td>
+                            <td class="action-link">Send thank you</td>
+                          </tr>
+                          <tr>
+                            <td>Noah Kim</td>
+                            <td>LinkedIn</td>
+                            <td>Yesterday</td>
+                            <td class="action-link">Share updated resume</td>
+                          </tr>
+                          <tr>
+                            <td>Elena Morris</td>
+                            <td>Email</td>
+                            <td>3 days ago</td>
+                            <td class="action-link">Prep questions</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="section-card mini-section" id="resume-module">
+                    <div class="mini-head">
+                      <h3 class="card-title">Resumes &amp; Cover Letters</h3>
+                      <div
+                        class="btn btn-outline"
+                        data-media-type="banani-button"
+                      >
+                        Upload File
+                      </div>
+                    </div>
+                    <div class="mini-body">
+                      <div class="stack-list">
+                        <div class="resource-row">
+                          <div class="resource-main">
+                            <div class="resource-title">
+                              Frontend-Resume-v4.pdf
+                            </div>
+                            <div class="resource-meta">
+                              Used in 14 applications · Updated yesterday
+                            </div>
+                          </div>
+                          <div class="pill stage-applied">
+                            <div class="pill-dot"></div>
+                            Default
+                          </div>
+                        </div>
+                        <div class="resource-row">
+                          <div class="resource-main">
+                            <div class="resource-title">
+                              Product-Design-Resume-v3.pdf
+                            </div>
+                            <div class="resource-meta">
+                              Used in 9 applications · ATS score 91
+                            </div>
+                          </div>
+                          <div
+                            class="action-link"
+                            data-media-type="banani-button"
+                          >
+                            Duplicate
+                          </div>
+                        </div>
+                        <div class="resource-row">
+                          <div class="resource-main">
+                            <div class="resource-title">
+                              AI Cover Letter · Airbnb
+                            </div>
+                            <div class="resource-meta">
+                              Generated from job description · 2 edits
+                            </div>
+                          </div>
+                          <div
+                            class="action-link"
+                            data-media-type="banani-button"
+                          >
+                            Open
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section-card mini-section" id="prep-module">
+                    <div class="mini-head">
+                      <h3 class="card-title">Interview Prep</h3>
+                      <div
+                        class="btn btn-outline"
+                        data-media-type="banani-button"
+                      >
+                        Generate Q&amp;A
+                      </div>
+                    </div>
+                    <div class="mini-body">
+                      <div class="stack-list">
+                        <div class="qa-card">
+                          <div class="qa-question">
+                            Tell me about a time you improved a hiring funnel
+                            metric or product metric.
+                          </div>
+                          <div class="qa-answer">
+                            Use STAR, quantify the baseline, and explain the
+                            collaboration loop with recruiters, PMs, or
+                            engineers.
+                          </div>
+                        </div>
+                        <div class="qa-card">
+                          <div class="qa-question">
+                            How do you prioritize applications when juggling
+                            multiple interviews?
+                          </div>
+                          <div class="qa-answer">
+                            Compare role fit, timeline, compensation, and energy
+                            cost. Tie the answer back to your tracking system
+                            and reminders.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="section-card mini-section"
+                  id="settings-admin-module"
+                >
+                  <div class="mini-head">
+                    <h3 class="card-title">Settings &amp; Admin Panel</h3>
+                    <div
+                      class="btn btn-outline"
+                      data-media-type="banani-button"
+                    >
+                      Open Audit Log
+                    </div>
+                  </div>
+                  <div
+                    class="mini-body"
+                    style="display: flex; flex-direction: column; gap: 16px"
+                  >
+                    <div class="settings-grid">
+                      <div class="setting-item">
+                        <div class="setting-title">Connected Gmail</div>
+                        <div class="setting-copy">
+                          OAuth active · Last sync 14 minutes ago ·
+                          Free/Pro/Elite limits enforced server-side.
+                        </div>
+                      </div>
+                      <div class="setting-item">
+                        <div class="setting-title">Security</div>
+                        <div class="setting-copy">
+                          JWT auth, MFA with TOTP, DLP sanitization for AI
+                          calls, and audit logging enabled.
+                        </div>
+                      </div>
+                      <div class="setting-item">
+                        <div class="setting-title">Billing</div>
+                        <div class="setting-copy">
+                          Stripe customer active on Pro tier with 5 syncs/day
+                          and upgrade path to Elite.
+                        </div>
+                      </div>
+                    </div>
+                    <table class="table-mini">
+                      <thead>
+                        <tr>
+                          <th>User</th>
+                          <th>Role</th>
+                          <th>Last Login</th>
+                          <th>Audit Event</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>alex@gmail.com</td>
+                          <td>Owner</td>
+                          <td>Today, 9:10 AM</td>
+                          <td>Manual sync triggered</td>
+                          <td>
+                            <div class="pill stage-offer">
+                              <div class="pill-dot"></div>
+                              Healthy
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>system</td>
+                          <td>Worker</td>
+                          <td>Today, 8:58 AM</td>
+                          <td>18 emails extracted</td>
+                          <td>
+                            <div class="pill stage-applied">
+                              <div class="pill-dot"></div>
+                              Running
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>security</td>
+                          <td>Audit</td>
+                          <td>Today, 8:42 AM</td>
+                          <td>DLP scrub applied to 2 messages</td>
+                          <td>
+                            <div class="pill stage-interview">
+                              <div class="pill-dot"></div>
+                              Review
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </body>
+  </html>
+  <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+  <style>
+    :root {
+      --background: #f7fafc;
+      --foreground: #0f1724;
+      --border: #00000014;
+      --input: #ffffff;
+      --primary: #0ca6a6;
+      --primary-foreground: #ffffff;
+      --secondary: #e6fffa;
+      --secondary-foreground: #055054;
+      --muted: #f1f5f9;
+      --muted-foreground: #94a3b8;
+      --success: #16a34a;
+      --success-foreground: #ffffff;
+      --accent: #ffb020;
+      --accent-foreground: #092827;
+      --destructive: #ef4444;
+      --destructive-foreground: #ffffff;
+      --warning: #f59e0b;
+      --warning-foreground: #08121a;
+      --card: #ffffff;
+      --card-foreground: #0f1724;
+      --sidebar: #e6f7f7;
+      --sidebar-foreground: #044e4e;
+      --sidebar-primary: #0ca6a6;
+      --sidebar-primary-foreground: #ffffff;
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-xl: 12px;
+      --font-family-body: Inter;
+    }
+  </style>
+</div>
+
+</design>
+```

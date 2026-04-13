@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import {
   MdDashboard, MdWork, MdDescription, MdPeople, MdEmail, MdPsychology,
   MdCampaign, MdNotifications, MdSearch, MdPerson, MdLogout, MdSettings,
+  MdSync, MdStar, MdShieldMoon,
 } from "react-icons/md";
 import { TierBadge } from "../components/shared/TierBadge";
 import {
@@ -64,6 +65,13 @@ const NAV_ICONS = {
   "Reminders":      <MdNotifications size={17} />,
   "Settings":       <MdSettings size={17} />,
 };
+
+const NAV_GROUPS = [
+  { label: "Dashboard", items: ["Dashboard", "Job Tracker"] },
+  { label: "Network",   items: ["Contacts", "Outreach"] },
+  { label: "Toolkit",   items: ["Resume Manager", "Templates", "Interview Prep", "Reminders"] },
+  { label: "System",    items: ["Settings"] },
+];
 
 export function DashboardPage({ routeView = "Dashboard" }) {
   const { user, logout, refreshUser } = useAuth();
@@ -618,21 +626,44 @@ export function DashboardPage({ routeView = "Dashboard" }) {
           </div>
         </div>
 
-        <nav className="menu">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`menu-item ${activeView === item ? "active" : ""}`}
-              onClick={() => handleViewChange(item)}
-            >
-              <span className="menu-item-icon">{NAV_ICONS[item]}</span>
-              {item}
-            </button>
+        <nav className="menu" style={{ marginTop: "1.25rem" }}>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="nav-group">
+              <div className="nav-group-label">{group.label}</div>
+              {group.items.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`menu-item ${activeView === item ? "active" : ""}`}
+                  onClick={() => handleViewChange(item)}
+                >
+                  <span className="menu-item-icon">{NAV_ICONS[item]}</span>
+                  {item}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
         <div className="sidebar-footer">
+          <div className="cc-tier-card">
+            <div className="cc-tier-top">
+              <span className="cc-tier-title">
+                {user?.role === "elite" ? "Elite" : user?.role === "pro" ? "Pro" : "Free"} Tier
+              </span>
+              <MdStar size={14} style={{ color: "#fbbf24" }} />
+            </div>
+            <div className="cc-tier-copy">
+              {user?.role === "free" ? "Upgrade to sync Gmail" : "Gmail sync active"}
+            </div>
+            <div className="cc-tier-bar">
+              <div
+                className="cc-tier-bar-fill"
+                style={{ width: user?.role === "elite" ? "90%" : user?.role === "pro" ? "60%" : "20%" }}
+              />
+            </div>
+          </div>
+
           <div className="sidebar-profile-card">
             <div
               className="sidebar-user-avatar"
@@ -663,7 +694,53 @@ export function DashboardPage({ routeView = "Dashboard" }) {
         </div>
       </aside>
 
-      <main className="content">
+      <div className="content-shell">
+        {/* ── Topbar ─────────────────────────────────────────── */}
+        <header className="cc-topbar">
+          <div className="cc-topbar-title">
+            {activeView === "Dashboard" ? "Command Center" : activeView}
+          </div>
+          <div className="cc-topbar-actions">
+            {connected && (
+              <div className="cc-badge-soft">
+                <MdStar size={13} />
+                Gemini AI Active
+              </div>
+            )}
+            {user?.email && (
+              <div className="cc-account-email">
+                <MdEmail size={13} />
+                {user.email}
+              </div>
+            )}
+            {connected && gmailSyncAllowed && (
+              <button
+                type="button"
+                className="cc-sync-btn"
+                onClick={() => handleRunSyncPreset("now")}
+                disabled={syncing}
+              >
+                <MdSync size={15} style={{ flexShrink: 0 }} />
+                {syncing ? "Syncing…" : "Sync Inbox"}
+              </button>
+            )}
+            <div
+              className="cc-topbar-avatar"
+              style={sidebarAvatarUrl ? undefined : sidebarAvatarFallbackStyle}
+              onClick={handleProfileOpen}
+              title="Open profile"
+            >
+              {sidebarAvatarUrl ? (
+                <img src={sidebarAvatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ color: "#fff" }}>{sidebarInitial}</span>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* ── Page scroll ────────────────────────────────────── */}
+        <div className="cc-page-scroll">
         {activeView === "Dashboard" && (
           <DashboardHomeView
             greetingText={greetingText}
@@ -675,6 +752,7 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             connected={connected}
             connectedFromCallback={connectedFromCallback}
             gmailSyncAllowed={gmailSyncAllowed}
+            jobs={jobs}
             successText={successText}
             errorText={errorText}
             stats={stats}
@@ -873,7 +951,8 @@ export function DashboardPage({ routeView = "Dashboard" }) {
             </p>
           </section>
         )}
-      </main>
+        </div>{/* end cc-page-scroll */}
+      </div>{/* end content-shell */}
       <CommandPalette />
       <MobileTabBar activeView={activeView} onNavigate={handleViewChange} />
     </div>

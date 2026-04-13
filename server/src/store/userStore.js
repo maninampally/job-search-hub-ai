@@ -45,6 +45,12 @@ const hasSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 const supabase = hasSupabase ? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY) : null;
 let allowSupabaseUsersTable = Boolean(supabase);
 
+/**
+ * In-memory session store — used when Supabase is not configured (local Docker dev).
+ * Map from tokenHash → session object.
+ */
+const localSessionStore = new Map();
+
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -416,7 +422,21 @@ function isMissingSessionsTableError(error) {
  * Gracefully returns null if the table doesn't exist yet.
  */
 async function createSession(userId, tokenHash, deviceFingerprint, ipAddress, userAgent, expiresAt) {
-  if (!supabase) return null;
+  if (!supabase) {
+    const session = {
+      id: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      user_id: userId,
+      token_hash: tokenHash,
+      device_fingerprint: deviceFingerprint || null,
+      ip_address: ipAddress || null,
+      user_agent: userAgent || null,
+      expires_at: expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt,
+      last_active: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+    localSessionStore.set(tokenHash, session);
+    return session;
+  }
   try {
     const { data, error } = await supabase.from("user_sessions").insert([{
       user_id: userId,
@@ -445,7 +465,16 @@ async function createSession(userId, tokenHash, deviceFingerprint, ipAddress, us
  * Returns null if not found or table missing.
  */
 async function getSessionByHash(tokenHash) {
-  if (!supabase || !tokenHash) return null;
+  if (!tokenHash) return null;
+  if (!supabase) {
+    const session = localSessionStore.get(tokenHash);
+    if (!session) return null;
+    if (new Date(session.expires_at) < new Date()) {
+      localSessionStore.delete(tokenHash);
+      return null;
+    }
+    return session;
+  }
   try {
     const { data, error } = await supabase
       .from("user_sessions")
@@ -470,7 +499,16 @@ async function getSessionByHash(tokenHash) {
  * Gracefully no-ops if table missing.
  */
 async function deleteSession(sessionId) {
-  if (!supabase || !sessionId) return null;
+  if (!sessionId) return null;
+  if (!supabase) {
+    for (const [hash, session] of localSessionStore.entries()) {
+      if (session.id === sessionId) {
+        localSessionStore.delete(hash);
+        break;
+      }
+    }
+    return true;
+  }
   try {
     const { error } = await supabase
       .from("user_sessions")
@@ -493,7 +531,13 @@ async function deleteSession(sessionId) {
  * Gracefully no-ops if table missing.
  */
 async function deleteAllUserSessions(userId) {
-  if (!supabase || !userId) return null;
+  if (!userId) return null;
+  if (!supabase) {
+    for (const [hash, session] of localSessionStore.entries()) {
+      if (session.user_id === userId) localSessionStore.delete(hash);
+    }
+    return true;
+  }
   try {
     const { error } = await supabase
       .from("user_sessions")
@@ -516,7 +560,15 @@ async function deleteAllUserSessions(userId) {
  * Used for "end all other sessions" feature.
  */
 async function deleteOtherSessions(userId, currentSessionId) {
-  if (!supabase || !userId) return null;
+  if (!userId) return null;
+  if (!supabase) {
+    for (const [hash, session] of localSessionStore.entries()) {
+      if (session.user_id === userId && session.id !== currentSessionId) {
+        localSessionStore.delete(hash);
+      }
+    }
+    return true;
+  }
   try {
     let q = supabase
       .from("user_sessions")
